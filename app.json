@@ -19,7 +19,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize",
+      "package": "com.kargaen.souschef"
     },
     "web": {
       "output": "static",
@@ -38,11 +40,21 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      "expo-sqlite",
+      "expo-localization",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Sous Chef to add photos of your dishes to your recipes.",
+          "cameraPermission": "Allow Sous Chef to take photos of your dishes."
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     }
   }
 }

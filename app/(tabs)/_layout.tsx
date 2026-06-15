@@ -1,34 +1,52 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Feather } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import type { ComponentProps } from "react";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { colors, typography } from "@/constants";
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+// Reserve room on the right of the bar for the floating chat launcher
+// (AssistantShell) so it reads as a final nav slot without overlapping the last
+// tab. Tune alongside the launcher's size/position.
+const LAUNCHER_TAB_BAR_RESERVE = 72;
 
+type FeatherName = ComponentProps<typeof Feather>["name"];
+
+const tabIcon =
+  (name: FeatherName) =>
+  ({ color, size }: { color: string; size: number }) => (
+    <Feather name={name} size={size} color={color} />
+  );
+
+export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+        tabBarActiveTintColor: colors.brand.terracotta,
+        tabBarInactiveTintColor: colors.text.muted,
+        tabBarLabelStyle: {
+          fontSize: typography.size.xs,
+          fontWeight: typography.weight.medium,
+        },
+        tabBarStyle: { paddingRight: LAUNCHER_TAB_BAR_RESERVE },
+      }}
+      backBehavior="history"
+    >
       <Tabs.Screen
         name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
+        options={{ title: "Home", tabBarIcon: tabIcon("home") }}
       />
       <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
+        name="recipes"
+        options={{ title: "Recipes", tabBarIcon: tabIcon("book-open") }}
+      />
+      <Tabs.Screen
+        name="pantry"
+        options={{ title: "Pantry", tabBarIcon: tabIcon("archive") }}
+      />
+      <Tabs.Screen
+        name="plan"
+        options={{ title: "Plan", tabBarIcon: tabIcon("calendar") }}
       />
     </Tabs>
   );
