@@ -14,12 +14,14 @@ import type {
   SuggestionSlot,
   WeekPlan,
 } from "../models/types";
-import { buildMealPlanningPrompt, buildSystemPrompt } from "../prompts";
+import { buildAdaptationPrompt, buildMealPlanningPrompt, buildSystemPrompt } from "../prompts";
 import {
   PLAN_DRAFT_SYSTEM_PROMPT,
   buildPlanDraftUserMessage,
   parsePlanDraft,
 } from "../prompts/mealPlanDraft";
+import { AdaptationResponseSchema } from "../models/schemas";
+import { AdaptationService } from "../services/AdaptationService";
 import { HabitService } from "../services/HabitService";
 import { InspirationService } from "../services/InspirationService";
 import { LLMService } from "../services/LLMService";
@@ -200,6 +202,71 @@ export const useMealPlanController = () => {
 
     if (slot.recipeId) {
       cookLogRepo.recordCook({ recipeId: slot.recipeId });
+    }
+  };
+
+  // ─── P3.2 Tier-1 qualitative adaptation ─────────────────────────────────
+
+  // Runs a one-shot LLM adaptation for a queued AdaptationIntent on a slot:
+  // fetches the recipe → calls LLM → builds variant → saves → updates slot →
+  // removes the fulfilled intent from pendingActions. Silent no-op if the
+  // slot has no recipeId or the LLM response cannot be parsed.
+  const applyPendingAdaptation = async (
+    slotId: string,
+    description: string,
+  ): Promise<void> => {
+    if (!activePlan || !profile) return;
+    const slot = activePlan.slots.find((s) => s.id === slotId);
+    if (!slot?.recipeId) return;
+
+    setLoading(true);
+    try {
+      const recipe = await recipeRepo.fetchById(slot.recipeId);
+      if (!recipe) return;
+
+      const response = await LLMService.send({
+        system: buildSystemPrompt(profile),
+        messages: [
+          {
+            role: "user",
+            content: buildAdaptationPrompt({ recipe, reason: description }),
+          },
+        ],
+      });
+
+      const start = response.content.indexOf("{");
+      const end = response.content.lastIndexOf("}");
+      if (start === -1 || end <= start) return;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(response.content.slice(start, end + 1));
+      } catch {
+        return;
+      }
+
+      const validated = AdaptationResponseSchema.safeParse(parsed);
+      if (!validated.success) return;
+
+      const variant = AdaptationService.buildVariantRecipe(recipe, validated.data);
+      await recipeRepo.save(variant);
+
+      await persistPlan({
+        ...activePlan,
+        slots: activePlan.slots.map((s) =>
+          s.id === slotId ? { ...s, recipeId: variant.id } : s,
+        ),
+      });
+
+      setPendingActions(
+        pendingActions.filter(
+          (a) => !(a.slotId === slotId && a.description === description),
+        ),
+      );
+    } catch {
+      setError("Could not apply adaptation.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -597,6 +664,7 @@ export const useMealPlanController = () => {
     toggleShoppingItem,
     generateFromRequest,
     markSlotCooked,
+    applyPendingAdaptation,
     savePreset,
     deletePreset,
     generatePlan,
