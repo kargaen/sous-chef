@@ -120,28 +120,35 @@ rows still parse.
 
 ## Per-day input — one field, two paths, one parse moment
 
-A single text field per slot. No mode switches. Two paths reach the same outcome:
+A single text field per slot. No mode switches. Two paths submit to the **same parser** — there is only one receiver.
 
-**Path A — typeahead match (recipe chip morph)**
+**Path A — free-form text**
 
-The field runs fuzzy typeahead as the user types (token/substring, reuse the tokeniser). When the user taps a match the field morphs: the recipe title becomes a **recipe chip** (confirming `recipeId`), and a **note field** opens alongside it for any additional context ("for 8", "make it mild", "double the sauce"). The user can keep typing the note or leave it blank. The note is not parsed in-flight — it is raw text until save.
+The user types anything freely: "leftovers", "eat out", "Tom's curry for 8, mild". This submits as a raw string. No typeahead required.
 
-**Path B — free-form text**
+**Path B — typeahead chip morph**
 
-The user types anything freely: "leftovers", "eat out", "Tom's curry for 8, mild". No typeahead match is required. The text is stored as-is and is equally valid. This path is the fallback when typeahead isn't triggered, isn't helpful, or the user simply prefers to write naturally.
+The field runs fuzzy typeahead as the user types. When the user taps a match the field morphs: the recipe title becomes a **recipe chip** and a **note field** opens alongside it. The chip is purely visual — it does not write to the slot model and fires no backend call. What it does is structure the component state into two parts: a captured recipe title and a separate note string. On submit this is normalized to `{ chipTitle: "Tom's Curry", note: "for 8, mild" }`.
 
-**Post-submission parse (both paths)**
+**Unified submission contract**
 
-At save time, a `parseSlotNote` pass runs over every slot. For recipe-chip slots it parses the note field; for plain-text slots it parses the whole string. It extracts:
-- A recipe candidate if confident (fuzzy match → `recipeId`; no confident match → slot stays as `note`)
-- A servings hint ("for 8" → `servings: 8`, Tier-0 scale, no LLM)
-- Adaptation intents ("mild", "non-spicy", "for kids" → queued as **pending adaptation actions** the user confirms before any LLM runs)
+Both paths normalize to the same shape before the parser sees them:
 
-Anything the parser cannot resolve stays as the note string. The user sees the slot rendered correctly after save with any pending actions surfaced below it. Both paths arrive at the same resolved state — the difference is only whether the recipe chip was set during input or inferred by the parser at save.
+```
+Path A  →  { rawText: "Tom's curry for 8, mild" }
+Path B  →  { chipTitle: "Tom's Curry", note: "for 8, mild" }
+```
+
+`parseSlotInput` handles both identically. For `rawText` it splits title candidate from trailing context; for `chipTitle` the title is already separated. Either way it produces:
+- A confident recipe match → `recipeId` (fuzzy title match; no match → slot stays as `note`)
+- A servings hint → `servings: 8` (Tier-0 scale, no LLM)
+- Adaptation intents → queued as **pending adaptation actions** the user confirms before any LLM runs ("mild" → "Adapt Tom's Curry to a mild variant?")
+
+Anything unresolved stays as the `note` string. Both paths land on the same resolved slot and the same pending actions surface. The typeahead chip is a convenience that pre-structures the input — it is not a data commitment.
 
 **Ask Sous Chef (inline suggestion)**
 
-"Suggest something" returns one contextual idea. It lands as a **suggestion chip** (visually distinct from a confirmed recipe chip — outlined/dashed treatment). A note field appears alongside it. The user may tap "Try another" repeatedly without touching the plan or recipe database. Accepting a suggestion promotes it to a recipe chip (if it matches a saved recipe) or keeps it as a suggestion chip; the note field captures any modifications. Resolution to a persisted slot follows the same save-time gate as the AI draft flow.
+"Suggest something" returns one contextual idea. It lands as a **suggestion chip** (visually distinct from a confirmed recipe chip — outlined/dashed treatment) with a note field alongside it. The user may tap "Try another" repeatedly without touching the plan or recipe database. When accepted, the suggestion title feeds into the same `parseSlotInput` path at save time alongside any note the user added.
 
 ## Scaling & per-plan adaptations (two tiers)
 
@@ -283,10 +290,11 @@ arbitrary, variable length is nearly free. Keep the _default_ a clean 7.
   `shiftPlan(byDays)`, `extendPlan(days)`, `generateFromRequest(text,{usePantry})`,
   `suggestForSlot(...)`; shopping: `deriveForDates`, `toggleShoppingItem`. One active
   plan in the store.
-  `parseSlotNote(slot)` runs at save time (not in-flight) over every slot: extracts a
-  confident recipe match → `recipeId`, a servings hint → `servings` (Tier 0, no LLM),
-  and adaptation intents → queued pending actions. Unresolved text stays as `note`.
-  This is the single parse moment for both the free-text path and the chip+note path.
+  `parseSlotInput(input)` runs at save time (not in-flight) over every slot. It accepts
+  either `{ rawText }` (Path A) or `{ chipTitle, note }` (Path B) and produces the same
+  output: confident recipe match → `recipeId`, servings hint → `servings` (Tier 0, no
+  LLM), adaptation intents → queued pending actions, remainder → `note`. One function,
+  one receiver, both input shapes.
 - **View:** replace the placeholder with the editable plan screen + `DaySection`
   (active + spent), `PlannedSlotRow` (with scale badge), the flexible `AddToDayInput`,
   `PlanRequestBox`, `PantryToggle`, `NudgeSettingsInline` (settings-bound), a
