@@ -210,9 +210,10 @@ export default function PantryScreen() {
     try {
       const existingId = await findRecipeForSuggestion(suggestion);
       if (!existingId) {
-        await generateRecipeFromIdea(suggestion);
+        const generated = await generateRecipeFromIdea(suggestion);
+        if (!generated) return; // generation failed — don't navigate with nothing saved
       }
-      // Recipe is now saved — navigate to plan where the cook can add it by name
+      // Recipe is saved — navigate to plan where the cook can add it by name
       router.push({ pathname: "/(tabs)/plan" });
     } finally {
       setRecipeLoading(false);
@@ -342,7 +343,7 @@ export default function PantryScreen() {
           ) : null}
 
           {suggestions.map((suggestion, index) => (
-            <View key={suggestion.title} style={suggestionStyles.card}>
+            <View key={`${suggestion.title}-${index}`} style={suggestionStyles.card}>
               <View style={suggestionStyles.cardBody}>
                 <Text style={suggestionStyles.cardTitle}>{suggestion.title}</Text>
                 {suggestion.description ? (

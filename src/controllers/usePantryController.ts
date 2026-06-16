@@ -92,19 +92,25 @@ const normaliseQuantity = (value: string): number => {
   return parsed;
 };
 
-const normaliseExpiryDate = (value: string): string | undefined => {
+const normaliseExpiryDate = (value: string): string | undefined =>
+  normaliseDateField(value, "Expiry date");
+
+const normaliseCreatedDate = (value: string): string | undefined =>
+  normaliseDateField(value, "Made on date");
+
+const normaliseDateField = (value: string, label: string): string | undefined => {
   const trimmed = value.trim();
 
   if (!trimmed) return undefined;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    throw new Error("Expiry date must use YYYY-MM-DD.");
+    throw new Error(`${label} must use YYYY-MM-DD.`);
   }
 
   const parsed = new Date(`${trimmed}T00:00:00`);
 
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error("Expiry date is not valid.");
+    throw new Error(`${label} is not valid.`);
   }
 
   return trimmed;
@@ -128,7 +134,7 @@ const buildPantryItem = (draft: PantryItemDraft, id: string): PantryItem => {
     unit: draft.unit.trim() || "unit",
     storageZone: draft.storageZone,
     expiryDate: normaliseExpiryDate(draft.expiryDate),
-    createdDate: normaliseExpiryDate(draft.createdDate),
+    createdDate: normaliseCreatedDate(draft.createdDate),
   });
 };
 
@@ -274,7 +280,11 @@ export const usePantryController = () => {
         const nextItem: PantryItem = {
           ...buildPantryItem(draft, id),
           usedCount: existingItem.usedCount ?? 0,
-          createdDate: existingItem.createdDate,
+          // Prefer the user's edited createdDate; fall back to the stored value
+          // so existing items without a draft createdDate don't lose their date.
+          createdDate: draft.createdDate.trim()
+            ? normaliseCreatedDate(draft.createdDate)
+            : existingItem.createdDate,
           lastSurfacedAt: existingItem.lastSurfacedAt,
         };
         await repo.update(nextItem);
