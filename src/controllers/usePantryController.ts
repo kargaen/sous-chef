@@ -12,6 +12,14 @@ import { usePantryStore } from "../store/pantryStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { buildSystemPrompt } from "../prompts";
 import {
+  PANTRY_SUGGESTION_SYSTEM_PROMPT,
+  buildPantrySuggestionsPrompt,
+  buildPantrySwapPrompt,
+  parsePantrySuggestions,
+  type PantrySuggestion,
+} from "../prompts/pantrySuggestions";
+import { RecipeRepository } from "../models/repositories/RecipeRepository";
+import {
   formatPantryQuantity,
   getDaysUntilExpiry,
   getPantryExpiryLabel,
@@ -33,6 +41,7 @@ const NUDGE_WINDOW_MS: Record<PantryNudgeFrequency, number> = {
 };
 
 const repo = new PantryRepository();
+const recipeRepo = new RecipeRepository();
 
 export interface PantryItemViewModel {
   id: string;
@@ -426,6 +435,95 @@ export const usePantryController = () => {
     [items, upsertItem],
   );
 
+  // P5.2 — Returns 3-4 recipe suggestions derived from the prioritised
+  // pantry items. Stamps lastSurfacedAt on all surfaced items.
+  const suggestFromPantry = useCallback(async (): Promise<PantrySuggestion[]> => {
+    if (!profile) return [];
+    const candidates = getPrioritisedSuggestionItems();
+    if (candidates.length === 0) return [];
+
+    const contextItems = candidates.slice(0, 12).map((item) => ({
+      name: item.name,
+      zone: item.storageZone,
+      daysUntilExpiry: getDaysUntilExpiry(item.expiryDate),
+    }));
+
+    try {
+      const response = await LLMService.send({
+        system: PANTRY_SUGGESTION_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: buildPantrySuggestionsPrompt({
+              items: contextItems,
+              cuisinePreferences: profile.cuisinePreferences ?? [],
+              skillLevel: profile.skillLevel ?? null,
+              month: new Date().getMonth() + 1,
+            }),
+          },
+        ],
+      });
+
+      const suggestions = parsePantrySuggestions(response.content);
+      if (suggestions.length > 0) {
+        await markItemsSurfaced(candidates.slice(0, 12).map((i) => i.id));
+      }
+      return suggestions;
+    } catch {
+      return [];
+    }
+  }, [profile, getPrioritisedSuggestionItems, markItemsSurfaced]);
+
+  // P5.3 — Swaps one suggestion in the list; returns the replacement or null.
+  const swapSuggestion = useCallback(
+    async (
+      target: PantrySuggestion,
+      current: PantrySuggestion[],
+    ): Promise<PantrySuggestion | null> => {
+      if (!profile) return null;
+      try {
+        const response = await LLMService.send({
+          system: PANTRY_SUGGESTION_SYSTEM_PROMPT,
+          messages: [
+            {
+              role: "user",
+              content: buildPantrySwapPrompt(
+                target.primaryItemName || target.title,
+                current.map((s) => s.title),
+                {
+                  cuisinePreferences: profile.cuisinePreferences ?? [],
+                  skillLevel: profile.skillLevel ?? null,
+                  month: new Date().getMonth() + 1,
+                },
+              ),
+            },
+          ],
+        });
+        const results = parsePantrySuggestions(response.content);
+        return results[0] ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [profile],
+  );
+
+  // P5.4 — Fuzzy-matches a suggestion title against saved recipes.
+  // Returns the first match above a basic similarity threshold, or null.
+  const findRecipeForSuggestion = useCallback(
+    async (suggestion: PantrySuggestion): Promise<string | null> => {
+      const results = await recipeRepo.search(suggestion.title);
+      if (results.length === 0) return null;
+      const q = suggestion.title.toLowerCase();
+      const match = results.find((r) => {
+        const t = r.title.toLowerCase();
+        return t.includes(q) || q.includes(t) || t.split(" ").some((w) => q.includes(w) && w.length > 4);
+      });
+      return match?.id ?? null;
+    },
+    [],
+  );
+
   const itemViewModels = useMemo(() => {
     return sortPantryItems(items).map(toPantryItemViewModel);
   }, [items]);
@@ -445,6 +543,9 @@ export const usePantryController = () => {
     suggestShelfLife,
     getPrioritisedSuggestionItems,
     markItemsSurfaced,
+    suggestFromPantry,
+    swapSuggestion,
+    findRecipeForSuggestion,
     items: itemViewModels,
     wasteAlert,
     loading,
