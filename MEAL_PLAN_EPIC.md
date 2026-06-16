@@ -65,7 +65,13 @@ user does requires the AI.
 
 Owned up front, not discovered:
 
-1. **A slot is recipe _or_ note.** Extend `MealSlot` with `recipeId?: string | null`, `note?: string`, optional `servings`, and optional status. Validate at least one of recipeId/note. AI suggestions are transient UI state, not persisted plan data. A suggestion exists only while being presented to the user. When accepted, it becomes either a freeform note (note) or a recipe assignment (recipeId). Rejected suggestions leave no persisted state.
+1. **A slot is recipe _or_ note — never a suggestion.** Extend `MealSlot` with `recipeId?: string | null`, `note?: string`, optional `servings`, and optional status. Validate at least one of recipeId/note is present on any _persisted_ slot.
+
+   **Suggestions are transient UI state only.** The editable plan view holds a parallel, in-memory list of unresolved suggestion slots alongside the persisted plan. These slots exist only in component/controller state; they are never written to the repository. The user may generate, discard, and regenerate suggestions freely without touching the plan or the recipe database.
+
+   Resolution happens in two moments:
+   - **Inline (per-slot "Ask Sous Chef"):** the user sees one suggestion at a time and taps "Accept as note", "Create recipe", or "Try another". No save required; resolution is immediate and deliberate.
+   - **First save (AI draft flow):** when the user submits a drafted plan that contains unresolved suggestion slots, the app pauses before writing to the repository and presents a **suggestion review step**: a list of every unresolved suggestion. For each, the user picks "Save as note", "Create recipe" (opens `/recipes/new?seed=…`), or "Remove". Only after all suggestions are resolved (or dismissed) does the plan save. Re-generating the draft before saving is free — no suggestions accumulate in storage between attempts.
 2. **Per-slot scaling (Tier 0).** Add a target **`servings`** (already present) as
    the scale driver, with the linear multiplier derived as
    `slotServings / recipe.baseServings`. No extra field strictly needed; expose the
@@ -106,7 +112,7 @@ rows still parse.
    slot still actionable (bump forward) — the plan is a record, not just a forecast.
 6. **Active day sections** — today → end, today highlighted, each listing its slots.
 7. **Per-slot row** — recipe title (with a scale badge like "×2 · for 8") _or_
-   freeform note. Suggestion chips are transient UI shown only during suggestion workflows and are not persisted with the plan.
+   freeform note _or_ a **suggestion chip** (transient only — visually distinct, never persisted). Suggestion chips render in an "unresolved" style so the user can immediately see which slots still need confirmation. They are cleared on rejection or on plan save via the suggestion review step.
 8. **Per-day "+ Add"** — the flexible day input (below).
 9. **Shopping action** — opens the scoped shopping list (below).
 10. **Empty states** — empty day "Nothing planned"; empty plan invites the first
@@ -162,11 +168,10 @@ weekdays, big weekend; Wednesday friends over for [dish]; maybe leftovers Thursd
   date + length, per-day framing, season, pantry/expiring **iff the toggle is on**,
   recent cooks, tastes, the **nudging bias** from settings.
 - One LLM call + tolerant parser (mirror `parseSparks`/`parseGeneratedThemes`) → a
-  draft Plan. Each day resolves to either a **saved recipe when confident** (fuzzy match),
-  else a **freeform note** ("leftovers"), or an **unresolved suggestion**. Low-confidence recipe ideas are represented as notes until the user explicitly converts them into recipes.
+  draft Plan. Each day resolves to one of three outcomes: a **saved recipe when confident** (fuzzy match on title), a **freeform note** for explicit literals ("leftovers", "eat out"), or an **unresolved suggestion** for everything else. Low-confidence meal ideas always land as suggestion slots — never auto-promoted to notes. The user must explicitly confirm them.
   Scale-only phrases set `servings`; qualitative ones become **pending adaptation actions**.
-- **Review before save** — the draft lands in the editable view; nothing overwrites an
-  existing plan without confirmation; failure-silent.
+- **Review before save** — the draft lands in the editable view as a mix of recipe slots, note slots, and suggestion chips. The user reads, tweaks, and can re-generate as many times as they like; none of this touches the repository. Only when the user taps **Save plan** does anything persist.
+- **Suggestion resolution gate (first save)** — if the plan contains any unresolved suggestion slots when the user saves, a **suggestion review sheet** appears before the repository write. It lists every suggestion with three actions per row: "Save as note", "Create recipe" (seeds `/recipes/new?seed=…` and parks the slot until the recipe is saved), or "Remove". Once all suggestions are resolved or removed, the plan writes. Aborting the sheet returns the user to the editable view with suggestions still intact for further iteration.
 
 ## Plan presets (saved plan "themes")
 
@@ -293,8 +298,7 @@ slot (confirm-first).
 
 **Phase 4 — Pantry & live settings surface** 13. `P4.1` `PantryToggle` (per-generation, seeded from setting) feeding context. 14. `P4.2` `NudgeSettingsInline` bound live to `useSettingsController`.
 
-**Phase 5 — Full AI draft** 15. `P5.1` Plan-generation prompt + tolerant parser → draft Plan. 16. `P5.2` Day-aware context bundle (reuse/extend). 17. `P5.3` `PlanRequestBox` → `generateFromRequest` → review-before-save. 18. `P5.4` Title→recipe resolution + scale/adaptation intent (scale sets servings;
-qualitative → pending adaptation action).
+**Phase 5 — Full AI draft** 15. `P5.1` Plan-generation prompt + tolerant parser → draft Plan (recipe | note | suggestion per slot). 16. `P5.2` Day-aware context bundle (reuse/extend). 17. `P5.3` `PlanRequestBox` → `generateFromRequest` → editable view with suggestion chips visible; user can re-generate freely. 18. `P5.4` Title→recipe resolution + scale/adaptation intent (scale sets servings; qualitative → pending adaptation action). 19. `P5.5` Suggestion review sheet on first save: list unresolved suggestions → "Save as note" / "Create recipe" / "Remove" per row → plan writes only after all are resolved.
 
 **Phase 6 — Plan presets (themes)** 19. `P6.1` `PlanPreset` model + KV-backed `PlanPresetRepository` (save/list/delete). 20. `P6.2` Plan home: "Create plan" + saved-presets list; tap a preset → new plan
 drafted from its instructions. 21. `P6.3` Save a preset (name + instructions, or boil down the current request with
@@ -309,7 +313,7 @@ same-day pick-up; regenerate on signature change. 26. `P7.4` Print/share the sco
 
 ## Risks / gaps
 
-- **Slot polymorphism.** Persisted slots are recipe or note only. Transient suggestion UI must never leak into persisted plan data.
+- **Slot polymorphism.** Persisted slots are recipe or note only — never suggestion. The suggestion review gate on first save is the single enforcement point. Unresolved suggestion slots must live in controller/component state, never in the plan model passed to the repository. Any code path that writes a slot must assert that at least one of `recipeId`/`note` is set.
 - **Title resolution.** "Tom's curry" must not silently bind to a random saved curry;
   resolve only on confident match, else a note.
 - **Token cost / latency.** Generation and per-slot suggestion are explicit/on-demand;
