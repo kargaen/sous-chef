@@ -15,15 +15,16 @@ export class ShoppingListRepository {
 
     // Placeholder derivation — will be replaced with real logic in the controller layer
     const items: ShoppingItem[] = plan.slots
+      .filter((slot) => !!slot.recipeId)
       .flatMap((slot) => [
         {
           id: `${slot.id}-placeholder`,
           name: `Ingredients for recipe ${slot.recipeId}`,
-          quantity: slot.servings,
+          quantity: slot.servings ?? 1,
           unit: "serving",
           section: "other" as StoreSection,
           checked: false,
-          recipeIds: [slot.recipeId],
+          recipeIds: [slot.recipeId as string],
         },
       ])
       .filter((item) => !pantryNames.has(item.name.toLowerCase()));
