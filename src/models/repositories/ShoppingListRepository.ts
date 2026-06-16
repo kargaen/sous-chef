@@ -20,9 +20,16 @@ export class ShoppingListRepository {
   private pantryRepo = new PantryRepository();
   private recipeRepo = new RecipeRepository();
 
-  async deriveForWeek(weekStartDate: string): Promise<ListGroup[]> {
+  // Derive the shopping list scoped to specific dates within the given plan.
+  // If `dates` is omitted, all plan slots are included.
+  async deriveForDates(weekStartDate: string, dates?: string[]): Promise<ListGroup[]> {
     const plan = await this.mealPlanRepo.getByWeek(weekStartDate);
     if (!plan) return [];
+
+    const dateSet = dates ? new Set(dates) : null;
+    const scoped = dateSet
+      ? plan.slots.filter((s) => dateSet.has(s.date))
+      : plan.slots;
 
     const pantryItems = await this.pantryRepo.getAll();
     const pantryNames = new Set(pantryItems.map((p) => p.name.toLowerCase()));
@@ -30,7 +37,7 @@ export class ShoppingListRepository {
     // ingredient name (lower) → aggregated ShoppingItem
     const aggregated = new Map<string, ShoppingItem>();
 
-    for (const slot of plan.slots) {
+    for (const slot of scoped) {
       if (!slot.recipeId) continue;
 
       const recipe = await this.recipeRepo.fetchById(slot.recipeId);
@@ -86,5 +93,10 @@ export class ShoppingListRepository {
       section,
       items: grouped.get(section) ?? [],
     }));
+  }
+
+  // Convenience: derive for the whole plan week (no date filter).
+  async deriveForWeek(weekStartDate: string): Promise<ListGroup[]> {
+    return this.deriveForDates(weekStartDate);
   }
 }

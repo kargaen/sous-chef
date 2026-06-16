@@ -81,6 +81,7 @@ export const useMealPlanController = () => {
   const {
     activePlan,
     setActivePlan,
+    shoppingList,
     setShoppingList,
     draftSlots,
     setDraftSlots,
@@ -350,14 +351,31 @@ export const useMealPlanController = () => {
 
   // ─── Shopping list ────────────────────────────────────────────────────────
 
-  const deriveShoppingList = async (weekStartDate: string): Promise<void> => {
+  // Derive (or re-derive) the shopping list for the given plan, optionally
+  // scoped to specific dates. Replaces the current shoppingList in the store.
+  const deriveShoppingList = async (
+    weekStartDate: string,
+    dates?: string[],
+  ): Promise<void> => {
     try {
-      const list = await shoppingRepo.deriveForWeek(weekStartDate);
+      const list = await shoppingRepo.deriveForDates(weekStartDate, dates);
       setShoppingList(list);
       HabitService.record("shopping_list_viewed");
     } catch {
       setError("Could not derive shopping list.");
     }
+  };
+
+  // Toggle a single item's checked state in the store (no persistence — the
+  // list regenerates on scope change or plan edit, which resets checks).
+  const toggleShoppingItem = (itemId: string): void => {
+    const next = shoppingList.map((group) => ({
+      ...group,
+      items: group.items.map((item) =>
+        item.id === itemId ? { ...item, checked: !item.checked } : item,
+      ),
+    }));
+    setShoppingList(next);
   };
 
   // ─── Legacy ───────────────────────────────────────────────────────────────
@@ -409,6 +427,7 @@ export const useMealPlanController = () => {
 
   return {
     activePlan,
+    shoppingList,
     draftSlots,
     pendingActions,
     savedRecipes,
@@ -432,6 +451,7 @@ export const useMealPlanController = () => {
     shiftPlan,
     extendPlan,
     deriveShoppingList,
+    toggleShoppingItem,
     generatePlan,
   };
 };
