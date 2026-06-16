@@ -118,17 +118,30 @@ rows still parse.
 10. **Empty states** — empty day "Nothing planned"; empty plan invites the first
     entry or an AI draft; empty cookbook routes to `/recipes/new`.
 
-## Per-day input — one field, three powers (no flow breaks)
+## Per-day input — one field, two paths, one parse moment
 
-A single input per day/slot, no mode switches:
+A single text field per slot. No mode switches. Two paths reach the same outcome:
 
-- **Plain text** — "leftovers", "eat out", "Mum's lasagne" → freeform `note`.
-- **Fuzzy-pick a saved recipe** — typeahead by token/substring (reuse the tokeniser)
-  so the exact title is never required. Selecting one sets `recipeId`.
-- **Ask Sous Chef** — inline "suggest something" returns one contextual idea (day,
-  meal type, pantry-if-on, season, tastes, nudging), reusing the spark prompt/parser.
-  The user accepts it as a note or **seeds the creator** (`/recipes/new?seed=…`)
-  without leaving the plan. Suggestions are intentionally lightweight, seed-only and disposable. The user may request another suggestion repeatedly ("Try another") without creating recipes, mutating the plan, or cluttering the cookbook. Only a deliberate "Create recipe" action persists anything.
+**Path A — typeahead match (recipe chip morph)**
+
+The field runs fuzzy typeahead as the user types (token/substring, reuse the tokeniser). When the user taps a match the field morphs: the recipe title becomes a **recipe chip** (confirming `recipeId`), and a **note field** opens alongside it for any additional context ("for 8", "make it mild", "double the sauce"). The user can keep typing the note or leave it blank. The note is not parsed in-flight — it is raw text until save.
+
+**Path B — free-form text**
+
+The user types anything freely: "leftovers", "eat out", "Tom's curry for 8, mild". No typeahead match is required. The text is stored as-is and is equally valid. This path is the fallback when typeahead isn't triggered, isn't helpful, or the user simply prefers to write naturally.
+
+**Post-submission parse (both paths)**
+
+At save time, a `parseSlotNote` pass runs over every slot. For recipe-chip slots it parses the note field; for plain-text slots it parses the whole string. It extracts:
+- A recipe candidate if confident (fuzzy match → `recipeId`; no confident match → slot stays as `note`)
+- A servings hint ("for 8" → `servings: 8`, Tier-0 scale, no LLM)
+- Adaptation intents ("mild", "non-spicy", "for kids" → queued as **pending adaptation actions** the user confirms before any LLM runs)
+
+Anything the parser cannot resolve stays as the note string. The user sees the slot rendered correctly after save with any pending actions surfaced below it. Both paths arrive at the same resolved state — the difference is only whether the recipe chip was set during input or inferred by the parser at save.
+
+**Ask Sous Chef (inline suggestion)**
+
+"Suggest something" returns one contextual idea. It lands as a **suggestion chip** (visually distinct from a confirmed recipe chip — outlined/dashed treatment). A note field appears alongside it. The user may tap "Try another" repeatedly without touching the plan or recipe database. Accepting a suggestion promotes it to a recipe chip (if it matches a saved recipe) or keeps it as a suggestion chip; the note field captures any modifications. Resolution to a persisted slot follows the same save-time gate as the AI draft flow.
 
 ## Scaling & per-plan adaptations (two tiers)
 
@@ -270,6 +283,10 @@ arbitrary, variable length is nearly free. Keep the _default_ a clean 7.
   `shiftPlan(byDays)`, `extendPlan(days)`, `generateFromRequest(text,{usePantry})`,
   `suggestForSlot(...)`; shopping: `deriveForDates`, `toggleShoppingItem`. One active
   plan in the store.
+  `parseSlotNote(slot)` runs at save time (not in-flight) over every slot: extracts a
+  confident recipe match → `recipeId`, a servings hint → `servings` (Tier 0, no LLM),
+  and adaptation intents → queued pending actions. Unresolved text stays as `note`.
+  This is the single parse moment for both the free-text path and the chip+note path.
 - **View:** replace the placeholder with the editable plan screen + `DaySection`
   (active + spent), `PlannedSlotRow` (with scale badge), the flexible `AddToDayInput`,
   `PlanRequestBox`, `PantryToggle`, `NudgeSettingsInline` (settings-bound), a
