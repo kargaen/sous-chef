@@ -7,4 +7,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   learnFromChats: true,
   assistantOutputLanguage: "imply",
   skipSafetyLayer1: false,
+  weekStartDay: 1,
+  defaultPlanLength: 7,
 };

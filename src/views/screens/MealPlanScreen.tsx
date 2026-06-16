@@ -21,8 +21,7 @@ export default function MealPlanScreen() {
   const insets = useSafeAreaInsets();
   const ctrl = useMealPlanController();
 
-  // Monday by default until Settings.types.ts is extended.
-  const currentStartDate = planStart(1);
+  const currentStartDate = planStart(ctrl.weekStartDay);
 
   useEffect(() => {
     ctrl.loadPlanForWeek(currentStartDate);
@@ -71,7 +70,7 @@ export default function MealPlanScreen() {
             label="Create this week's plan"
             variant="primary"
             onPress={async () => {
-              await ctrl.createPlan(currentStartDate, 7);
+              await ctrl.createPlan(currentStartDate);
             }}
           />
         </View>

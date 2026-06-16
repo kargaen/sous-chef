@@ -19,6 +19,7 @@ import { LLMService } from "../services/LLMService";
 import { SeasonalService } from "../services/SeasonalService";
 import { useChefProfileStore } from "../store/chefProfileStore";
 import { useMealPlanStore } from "../store/mealPlanStore";
+import { useSettingsStore } from "../store/settingsStore";
 import {
   matchIngredient,
   normalizeIngredientName,
@@ -87,6 +88,11 @@ export const useMealPlanController = () => {
     setPendingActions,
   } = useMealPlanStore();
   const profile = useChefProfileStore((s) => s.profile);
+  const appSettings = useSettingsStore((s) => s.settings);
+
+  const weekStartDay: 0 | 1 | 2 | 3 | 4 | 5 | 6 =
+    appSettings?.weekStartDay ?? 1;
+  const defaultPlanLength = appSettings?.defaultPlanLength ?? 7;
 
   // Load saved recipes once for typeahead and parseSlotInput matching.
   useEffect(() => {
@@ -111,16 +117,16 @@ export const useMealPlanController = () => {
 
   // ─── P1.4 Core slot operations ───────────────────────────────────────────
 
-  // weekStartDay defaults to 1 (Monday) until Settings.types.ts is extended.
   const createPlan = async (
     startDate?: string,
-    dayCount = 7,
+    dayCount?: number,
   ): Promise<WeekPlan> => {
-    const weekStartDate = startDate ?? planStart(1);
+    const weekStartDate = startDate ?? planStart(weekStartDay);
+    const resolvedDayCount = dayCount ?? defaultPlanLength;
     const plan: WeekPlan = {
       id: `plan-${Date.now()}`,
       weekStartDate,
-      dayCount,
+      dayCount: resolvedDayCount,
       slots: [],
     };
     await persistPlan(plan);
@@ -406,6 +412,8 @@ export const useMealPlanController = () => {
     draftSlots,
     pendingActions,
     savedRecipes,
+    weekStartDay,
+    defaultPlanLength,
     loading,
     error,
     createPlan,
