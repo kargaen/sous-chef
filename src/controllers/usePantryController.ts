@@ -230,7 +230,12 @@ export const usePantryController = () => {
           throw new Error("That pantry item could not be found.");
         }
 
-        const nextItem = buildPantryItem(draft, id);
+        const nextItem: PantryItem = {
+          ...buildPantryItem(draft, id),
+          usedCount: existingItem.usedCount ?? 0,
+          createdDate: existingItem.createdDate,
+          lastSurfacedAt: existingItem.lastSurfacedAt,
+        };
         await repo.update(nextItem);
         upsertItem(nextItem);
         await refreshExpiryBuckets();
@@ -270,9 +275,22 @@ export const usePantryController = () => {
 
   const markItemUsed = useCallback(
     async (id: string): Promise<boolean> => {
-      return removeItemById(id);
+      setError(null);
+      try {
+        const item = await repo.getById(id);
+        if (!item) return false;
+        const updated: PantryItem = { ...item, usedCount: (item.usedCount ?? 0) + 1 };
+        await repo.update(updated);
+        upsertItem(updated);
+        HabitService.record("pantry_item_used");
+        return true;
+      } catch (err) {
+        log.error("Could not mark pantry item as used", err);
+        setError("Could not update item.");
+        return false;
+      }
     },
-    [removeItemById],
+    [upsertItem],
   );
 
   const logWasteForItem = useCallback(
