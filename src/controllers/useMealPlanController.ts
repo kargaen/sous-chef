@@ -406,7 +406,19 @@ export const useMealPlanController = () => {
   ): Promise<void> => {
     try {
       const list = await shoppingRepo.deriveForDates(weekStartDate, dates);
-      setShoppingList(list);
+      // Preserve checked ticks for items that still appear after re-derive.
+      const checkedIds = new Set(
+        shoppingList.flatMap((g) => g.items).filter((i) => i.checked).map((i) => i.id),
+      );
+      const merged = checkedIds.size === 0
+        ? list
+        : list.map((group) => ({
+            ...group,
+            items: group.items.map((item) =>
+              checkedIds.has(item.id) ? { ...item, checked: true } : item,
+            ),
+          }));
+      setShoppingList(merged);
       HabitService.record("shopping_list_viewed");
     } catch {
       setError("Could not derive shopping list.");
