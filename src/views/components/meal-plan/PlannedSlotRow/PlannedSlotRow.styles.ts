@@ -75,10 +75,37 @@ export const styles = StyleSheet.create({
     color: colors.brand.copper,
   },
 
+  cookButton: {
+    paddingTop: 2,
+    paddingLeft: spacing.xs,
+  },
+
   removeButton: {
     paddingTop: 2,
     paddingLeft: spacing.xs,
     hitSlop: 8,
+  },
+
+  rowCooked: {
+    opacity: 0.65,
+  },
+
+  typeLabelCooked: {
+    color: colors.text.muted,
+  },
+
+  recipeChipCooked: {
+    backgroundColor: colors.background.card,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+  },
+
+  recipeChipTextCooked: {
+    color: colors.text.muted,
+  },
+
+  noteTextCooked: {
+    color: colors.text.muted,
   },
 
   suggestionChip: {

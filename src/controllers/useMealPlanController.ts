@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { CookLogRepository } from "../models/repositories/CookLogRepository";
 import { MealPlanRepository } from "../models/repositories/MealPlanRepository";
 import { RecipeRepository } from "../models/repositories/RecipeRepository";
 import { ShoppingListRepository } from "../models/repositories/ShoppingListRepository";
@@ -40,6 +41,7 @@ const recipeRepo = new RecipeRepository();
 const shoppingRepo = new ShoppingListRepository();
 const pantryRepo = new PantryRepository();
 const presetRepo = new PlanPresetRepository();
+const cookLogRepo = new CookLogRepository();
 
 // Patterns that signal a servings quantity in free text.
 const SERVINGS_PATTERNS = [
@@ -180,6 +182,25 @@ export const useMealPlanController = () => {
         s.id === slotId ? { ...s, servings } : s,
       ),
     });
+  };
+
+  // Mark a slot cooked: set status="cooked" on the plan and log to CookLog
+  // if the slot has a linked recipe. Silently no-ops if the slot isn't found.
+  const markSlotCooked = async (slotId: string): Promise<void> => {
+    if (!activePlan) return;
+    const slot = activePlan.slots.find((s) => s.id === slotId);
+    if (!slot) return;
+
+    await persistPlan({
+      ...activePlan,
+      slots: activePlan.slots.map((s) =>
+        s.id === slotId ? { ...s, status: "cooked" as const } : s,
+      ),
+    });
+
+    if (slot.recipeId) {
+      cookLogRepo.recordCook({ recipeId: slot.recipeId });
+    }
   };
 
   // ─── P2.1 Recipe typeahead ───────────────────────────────────────────────
@@ -548,6 +569,7 @@ export const useMealPlanController = () => {
     deriveShoppingList,
     toggleShoppingItem,
     generateFromRequest,
+    markSlotCooked,
     savePreset,
     deletePreset,
     generatePlan,

@@ -20,6 +20,7 @@ export interface PlannedSlotRowProps {
   recipeTitle?: string;
   pendingActions: AdaptationIntent[];
   onRemove: (slotId: string) => void;
+  onMarkCooked?: (slotId: string) => void;
 }
 
 export function PlannedSlotRow({
@@ -27,40 +28,64 @@ export function PlannedSlotRow({
   recipeTitle,
   pendingActions,
   onRemove,
+  onMarkCooked,
 }: PlannedSlotRowProps) {
   const hasRecipe = !!slot.recipeId && !!recipeTitle;
   const scaleMultiplier =
     slot.servings != null && slot.servings > 0 ? slot.servings : null;
+  const isCooked = slot.status === "cooked";
 
   const slotActions = pendingActions.filter((a) => a.slotId === slot.id);
 
   return (
-    <View style={styles.row}>
-      <Text style={styles.typeLabel}>{TYPE_LABELS[slot.type]}</Text>
+    <View style={[styles.row, isCooked && styles.rowCooked]}>
+      <Text style={[styles.typeLabel, isCooked && styles.typeLabelCooked]}>
+        {TYPE_LABELS[slot.type]}
+      </Text>
 
       <View style={styles.contentColumn}>
         {hasRecipe ? (
-          <View style={styles.recipeChip}>
-            <Text style={styles.recipeChipText}>{recipeTitle}</Text>
-            {scaleMultiplier != null ? (
+          <View style={[styles.recipeChip, isCooked && styles.recipeChipCooked]}>
+            <Text style={[styles.recipeChipText, isCooked && styles.recipeChipTextCooked]}>
+              {recipeTitle}
+            </Text>
+            {scaleMultiplier != null && !isCooked ? (
               <Text style={styles.scaleBadge}>· {scaleMultiplier} srv</Text>
             ) : null}
           </View>
         ) : null}
 
         {slot.note ? (
-          <Text style={styles.noteText}>{slot.note}</Text>
+          <Text style={[styles.noteText, isCooked && styles.noteTextCooked]}>
+            {slot.note}
+          </Text>
         ) : null}
 
-        {slotActions.map((action, i) => (
-          <View key={`${action.slotId}-${i}`} style={styles.adaptationBadge}>
-            <Feather name="zap" size={10} color={colors.brand.copper} />
-            <Text style={styles.adaptationBadgeText}>
-              Adapt: {action.description}
-            </Text>
-          </View>
-        ))}
+        {!isCooked
+          ? slotActions.map((action, i) => (
+              <View key={`${action.slotId}-${i}`} style={styles.adaptationBadge}>
+                <Feather name="zap" size={10} color={colors.brand.copper} />
+                <Text style={styles.adaptationBadgeText}>
+                  Adapt: {action.description}
+                </Text>
+              </View>
+            ))
+          : null}
       </View>
+
+      {!isCooked && onMarkCooked ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Mark ${TYPE_LABELS[slot.type]} as cooked`}
+          hitSlop={8}
+          onPress={() => onMarkCooked(slot.id)}
+          style={styles.cookButton}
+        >
+          <Feather name="check-circle" size={16} color={colors.status.success} />
+        </Pressable>
+      ) : isCooked ? (
+        <Feather name="check-circle" size={16} color={colors.status.success} style={styles.cookButton} />
+      ) : null}
 
       <Pressable
         accessibilityRole="button"

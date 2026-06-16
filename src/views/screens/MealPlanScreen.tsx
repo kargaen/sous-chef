@@ -279,6 +279,7 @@ export default function MealPlanScreen() {
           resolveRecipeTitle={resolveRecipeTitle}
           onAddSlot={handleAddSlot}
           onRemoveSlot={ctrl.removeSlot}
+          onMarkCooked={ctrl.markSlotCooked}
           onAcceptSuggestion={handleAcceptSuggestion}
           onRejectSuggestion={ctrl.removeSuggestionSlot}
           onSuggest={handleSuggest}

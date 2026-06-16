@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, radius, spacing, typography } from "@/constants";
@@ -76,6 +76,24 @@ export default function ShoppingListScreen() {
     0,
   );
 
+  const handleShare = async () => {
+    if (ctrl.shoppingList.length === 0) return;
+    const lines = ctrl.shoppingList.map((group) => {
+      const header = (SECTION_LABELS[group.section] ?? group.section).toUpperCase();
+      const items = group.items
+        .map((item) => {
+          const qty =
+            item.quantity > 0
+              ? ` (${item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1)}${item.unit ? " " + item.unit : ""})`
+              : "";
+          return `  ${item.checked ? "✓ " : ""}${item.name}${qty}`;
+        })
+        .join("\n");
+      return `${header}\n${items}`;
+    });
+    await Share.share({ message: lines.join("\n\n"), title: "Shopping List" });
+  };
+
   return (
     <ScrollView
       style={screenStyles.screen}
@@ -86,9 +104,21 @@ export default function ShoppingListScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
-      <View style={screenStyles.header}>
-        <Text style={textStyles.eyebrow}>Shopping List</Text>
-        <Text style={textStyles.screenTitleCompact}>What to buy</Text>
+      <View style={styles.headerRow}>
+        <View style={screenStyles.header}>
+          <Text style={textStyles.eyebrow}>Shopping List</Text>
+          <Text style={textStyles.screenTitleCompact}>What to buy</Text>
+        </View>
+        {totalItems > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Share shopping list"
+            onPress={handleShare}
+            style={styles.shareButton}
+          >
+            <Feather name="share" size={18} color={colors.text.secondary} />
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Scope picker */}
@@ -183,6 +213,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: spacing.lg,
+  },
+
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+
+  shareButton: {
+    padding: spacing.xs,
   },
 
   // ── Scope picker ────────────────────────────────────────────────────────
