@@ -9,7 +9,7 @@ import type { MealSlotType, SlotInput, SuggestionSlot } from "@/models/types";
 import { Button } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
 
-import { DaySection } from "../components/meal-plan";
+import { DaySection, PlanRequestBox } from "../components/meal-plan";
 import {
   eachPlanDay,
   formatDayLabel,
@@ -106,7 +106,7 @@ export default function MealPlanScreen() {
       {/* Header */}
       <View style={screenStyles.header}>
         <Text style={textStyles.eyebrow}>Meal Plan</Text>
-        <Text style={textStyles.screenTitleCompact}>
+        <Text style={textStyles.screenTitleCompact} numberOfLines={1}>
           {plan
             ? formatDayLabel(plan.weekStartDate).replace(/\w+\s/, "") +
               " – " +
@@ -114,6 +114,12 @@ export default function MealPlanScreen() {
             : "This week"}
         </Text>
       </View>
+
+      {/* AI request box */}
+      <PlanRequestBox
+        loading={ctrl.loading}
+        onSubmit={(request) => ctrl.generateFromRequest(request)}
+      />
 
       {/* Spent days (collapsed summary) */}
       {spentDays.length > 0 ? (

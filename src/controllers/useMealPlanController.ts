@@ -13,6 +13,11 @@ import type {
   WeekPlan,
 } from "../models/types";
 import { buildMealPlanningPrompt, buildSystemPrompt } from "../prompts";
+import {
+  PLAN_DRAFT_SYSTEM_PROMPT,
+  buildPlanDraftUserMessage,
+  parsePlanDraft,
+} from "../prompts/mealPlanDraft";
 import { HabitService } from "../services/HabitService";
 import { InspirationService } from "../services/InspirationService";
 import { LLMService } from "../services/LLMService";
@@ -24,7 +29,7 @@ import {
   matchIngredient,
   normalizeIngredientName,
 } from "../utils/ingredientMatcher";
-import { addDays, formatDayLabel, planStart, todayKey } from "../utils/planDateUtils";
+import { addDays, eachPlanDay, formatDayLabel, planStart, todayKey } from "../utils/planDateUtils";
 
 const mealPlanRepo = new MealPlanRepository();
 const recipeRepo = new RecipeRepository();
@@ -378,6 +383,54 @@ export const useMealPlanController = () => {
     setShoppingList(next);
   };
 
+  // ─── P5 AI plan draft ────────────────────────────────────────────────────
+
+  // Generate a draft plan from a free-text request. Every LLM result lands as
+  // a SuggestionSlot in draftSlots (transient). Nothing is persisted here —
+  // the user accepts/dismisses each suggestion individually.
+  const generateFromRequest = async (request: string): Promise<void> => {
+    if (!activePlan || !request.trim()) return;
+    setLoading(true);
+    try {
+      const today = todayKey();
+      const days = eachPlanDay(activePlan.weekStartDate, activePlan.dayCount)
+        .filter((d) => d >= today)
+        .map((date) => ({ date, label: formatDayLabel(date) }));
+
+      const message = buildPlanDraftUserMessage({
+        request: request.trim(),
+        days,
+        month: new Date().getMonth() + 1,
+        region: profile?.region ?? null,
+        cuisinePreferences: profile?.cuisinePreferences ?? [],
+        skillLevel: profile?.skillLevel ?? null,
+      });
+
+      const response = await LLMService.send({
+        system: PLAN_DRAFT_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: message }],
+      });
+
+      const drafted = parsePlanDraft(response.content);
+
+      const newSuggestions: SuggestionSlot[] = drafted.map((slot) => ({
+        id: `suggestion-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date: slot.date,
+        type: slot.type,
+        suggestionText: slot.title,
+        note: slot.note,
+      }));
+
+      // Replace any existing draft slots (re-generating replaces the previous draft).
+      setDraftSlots(newSuggestions);
+      HabitService.record("meal_plan_created");
+    } catch {
+      setError("Could not draft meal plan. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ─── Legacy ───────────────────────────────────────────────────────────────
 
   const savePlan = async (plan: WeekPlan): Promise<void> => {
@@ -452,6 +505,7 @@ export const useMealPlanController = () => {
     extendPlan,
     deriveShoppingList,
     toggleShoppingItem,
+    generateFromRequest,
     generatePlan,
   };
 };
