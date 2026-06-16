@@ -3,12 +3,13 @@ import { ZodError } from "zod";
 
 import { PantryRepository } from "../models/repositories/PantryRepository";
 import { PantryItemSchema } from "../models/schemas/PantrySchema";
-import { STORAGE_ZONES, type PantryItem, type StorageZone } from "../models/types";
+import { STORAGE_ZONES, type PantryItem, type PantryNudgeFrequency, type StorageZone } from "../models/types";
 import { HabitService } from "../services/HabitService";
 import { LLMService } from "../services/LLMService";
 import { WasteService } from "../services/WasteService";
 import { useChefProfileStore } from "../store/chefProfileStore";
 import { usePantryStore } from "../store/pantryStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { buildSystemPrompt } from "../prompts";
 import {
   formatPantryQuantity,
@@ -23,6 +24,13 @@ import {
 import { createLogger } from "@/utils/logger";
 
 const log = createLogger("usePantryController");
+
+const NUDGE_WINDOW_MS: Record<PantryNudgeFrequency, number> = {
+  daily: 1 * 86_400_000,
+  weekly: 7 * 86_400_000,
+  monthly: 30 * 86_400_000,
+  rarely: 90 * 86_400_000,
+};
 
 const repo = new PantryRepository();
 
@@ -174,6 +182,7 @@ export const usePantryController = () => {
   const [expiredItems, setExpiredItems] = useState<PantryItem[]>([]);
 
   const profile = useChefProfileStore((s) => s.profile);
+  const appSettings = useSettingsStore((s) => s.settings);
   const items = usePantryStore((state) => state.items);
   const setItems = usePantryStore((state) => state.setItems);
   const upsertItem = usePantryStore((state) => state.upsertItem);
@@ -367,6 +376,56 @@ export const usePantryController = () => {
     [refreshExpiryBuckets, removeItem],
   );
 
+  // Returns items prioritised for the pantry suggestion flow (P5).
+  // Fridge/freezer items expiring soon come first; cupboard items follow
+  // when they have not been surfaced within the user's nudge window.
+  const getPrioritisedSuggestionItems = useCallback((): PantryItem[] => {
+    const frequency = appSettings?.pantryNudgeFrequency ?? "monthly";
+    const windowMs = NUDGE_WINDOW_MS[frequency];
+    const now = Date.now();
+
+    const expiring = items
+      .filter((item) => {
+        if (item.storageZone === "cupboard") return false;
+        const status = getPantryExpiryStatus(item.expiryDate);
+        return status === "soon" || status === "expired";
+      })
+      .sort((a, b) => {
+        const ad = getDaysUntilExpiry(a.expiryDate) ?? 999;
+        const bd = getDaysUntilExpiry(b.expiryDate) ?? 999;
+        return ad - bd;
+      });
+
+    const cupboard = items
+      .filter((item) => {
+        if (item.storageZone !== "cupboard") return false;
+        if (!item.lastSurfacedAt) return true;
+        return now - new Date(item.lastSurfacedAt).getTime() >= windowMs;
+      })
+      .sort((a, b) => {
+        const at = a.lastSurfacedAt ? new Date(a.lastSurfacedAt).getTime() : 0;
+        const bt = b.lastSurfacedAt ? new Date(b.lastSurfacedAt).getTime() : 0;
+        return at - bt;
+      });
+
+    return [...expiring, ...cupboard];
+  }, [items, appSettings]);
+
+  // Stamps lastSurfacedAt = now on a batch of items after a suggestion run.
+  const markItemsSurfaced = useCallback(
+    async (ids: string[]): Promise<void> => {
+      const now = new Date().toISOString();
+      for (const id of ids) {
+        const item = items.find((i) => i.id === id);
+        if (!item) continue;
+        const updated: PantryItem = { ...item, lastSurfacedAt: now };
+        await repo.update(updated);
+        upsertItem(updated);
+      }
+    },
+    [items, upsertItem],
+  );
+
   const itemViewModels = useMemo(() => {
     return sortPantryItems(items).map(toPantryItemViewModel);
   }, [items]);
@@ -384,6 +443,8 @@ export const usePantryController = () => {
     markItemUsed,
     logWasteForItem,
     suggestShelfLife,
+    getPrioritisedSuggestionItems,
+    markItemsSurfaced,
     items: itemViewModels,
     wasteAlert,
     loading,
