@@ -189,6 +189,7 @@ export const usePantryController = () => {
   const [error, setError] = useState<string | null>(null);
   const [expiringSoon, setExpiringSoon] = useState<PantryItem[]>([]);
   const [expiredItems, setExpiredItems] = useState<PantryItem[]>([]);
+  const [removalPrompt, setRemovalPrompt] = useState<{ id: string; name: string } | null>(null);
 
   const profile = useChefProfileStore((s) => s.profile);
   const appSettings = useSettingsStore((s) => s.settings);
@@ -318,6 +319,27 @@ export const usePantryController = () => {
         await repo.update(updated);
         upsertItem(updated);
         HabitService.record("pantry_item_used");
+
+        // Ask LLM whether usage count warrants a removal prompt. Non-fatal.
+        if (profile) {
+          try {
+            const response = await LLMService.send({
+              system: "You are a practical kitchen assistant. Answer only yes or no.",
+              messages: [
+                {
+                  role: "user",
+                  content: `Pantry item: "${updated.name}", used ${updated.usedCount} time${updated.usedCount === 1 ? "" : "s"}. Based on the name and usage count, should the user be asked if they want to remove it? Single-use items (one lime, one egg) → yes after 1 use. Bulk dry goods (flour, chickpeas, rice) → only after many uses. Homemade preserves → no. Reply with only: yes or no.`,
+                },
+              ],
+            });
+            if (/^yes/i.test(response.content.trim())) {
+              setRemovalPrompt({ id: updated.id, name: updated.name });
+            }
+          } catch {
+            // LLM failure is non-fatal — skip the prompt silently
+          }
+        }
+
         return true;
       } catch (err) {
         log.error("Could not mark pantry item as used", err);
@@ -325,8 +347,10 @@ export const usePantryController = () => {
         return false;
       }
     },
-    [upsertItem],
+    [upsertItem, profile],
   );
+
+  const clearRemovalPrompt = useCallback(() => setRemovalPrompt(null), []);
 
   // Asks the LLM how long a homemade item typically keeps in the fridge.
   // Returns a suggested YYYY-MM-DD expiry date, or null on failure.
@@ -539,6 +563,8 @@ export const usePantryController = () => {
     updateItem,
     removeItemById,
     markItemUsed,
+    removalPrompt,
+    clearRemovalPrompt,
     logWasteForItem,
     suggestShelfLife,
     getPrioritisedSuggestionItems,
