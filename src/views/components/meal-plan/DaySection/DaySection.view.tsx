@@ -97,7 +97,7 @@ export function DaySection({
             recipes={savedRecipes}
             onSubmit={(type, input) => onAddSlot(date, type, input)}
             onSuggest={
-              onSuggest ? () => onSuggest(date, "dinner") : undefined
+              onSuggest ? (type) => onSuggest(date, type) : undefined
             }
           />
         </View>

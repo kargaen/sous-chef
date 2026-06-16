@@ -31,7 +31,7 @@ export interface AddToDayInputProps {
   defaultType?: MealSlotType;
   recipes: Recipe[];
   onSubmit: (type: MealSlotType, input: SlotInput) => void;
-  onSuggest?: () => void;
+  onSuggest?: (type: MealSlotType) => void;
 }
 
 type InputMode = "idle" | "text" | "chip";
@@ -201,7 +201,7 @@ export function AddToDayInput({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Ask Sous Chef for a suggestion"
-              onPress={onSuggest}
+              onPress={() => onSuggest(mealType)}
               style={styles.suggestButton}
             >
               <Text style={styles.suggestButtonText}>Ask SC</Text>
