@@ -12,22 +12,38 @@ import type { MealSlotType, Recipe, SlotInput } from "@/models/types";
 
 import { styles } from "./AddToDayInput.styles";
 
+const MEAL_TYPES: MealSlotType[] = ["breakfast", "lunch", "dinner", "snack"];
+
+const TYPE_LABELS: Record<MealSlotType, string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snack: "Snack",
+};
+
+const nextType = (current: MealSlotType): MealSlotType => {
+  const idx = MEAL_TYPES.indexOf(current);
+  return MEAL_TYPES[(idx + 1) % MEAL_TYPES.length];
+};
+
 export interface AddToDayInputProps {
   date: string;
-  type: MealSlotType;
+  defaultType?: MealSlotType;
   recipes: Recipe[];
-  onSubmit: (input: SlotInput) => void;
+  onSubmit: (type: MealSlotType, input: SlotInput) => void;
   onSuggest?: () => void;
 }
 
 type InputMode = "idle" | "text" | "chip";
 
 export function AddToDayInput({
+  defaultType = "dinner",
   recipes,
   onSubmit,
   onSuggest,
 }: AddToDayInputProps) {
   const [mode, setMode] = useState<InputMode>("idle");
+  const [mealType, setMealType] = useState<MealSlotType>(defaultType);
   const [textValue, setTextValue] = useState("");
   const [noteValue, setNoteValue] = useState("");
   const [chipTitle, setChipTitle] = useState<string | null>(null);
@@ -41,6 +57,8 @@ export function AddToDayInput({
           r.title.toLowerCase().includes(textValue.toLowerCase()),
         )
       : [];
+
+  const cycleType = () => setMealType(nextType(mealType));
 
   const selectRecipe = (recipe: Recipe) => {
     setChipTitle(recipe.title);
@@ -59,11 +77,10 @@ export function AddToDayInput({
 
   const handleSubmit = () => {
     if (mode === "chip" && chipTitle != null) {
-      onSubmit({ chipTitle, note: noteValue.trim() });
+      onSubmit(mealType, { chipTitle, note: noteValue.trim() });
     } else if (textValue.trim()) {
-      onSubmit({ rawText: textValue.trim() });
+      onSubmit(mealType, { rawText: textValue.trim() });
     }
-    // Reset
     setMode("idle");
     setTextValue("");
     setNoteValue("");
@@ -93,9 +110,26 @@ export function AddToDayInput({
     );
   }
 
+  // ── Shared meal type selector ──────────────────────────────────────────
+
+  const TypePill = () => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Meal type: ${TYPE_LABELS[mealType]}. Tap to change.`}
+      onPress={cycleType}
+      style={styles.typeSelector}
+    >
+      <Text style={styles.typeSelectorText}>{TYPE_LABELS[mealType]}</Text>
+      <Feather name="chevron-down" size={10} color={colors.text.secondary} />
+    </Pressable>
+  );
+
+  // ── Chip mode ────────────────────────────────────────────────────────────
+
   if (mode === "chip" && chipTitle != null) {
     return (
       <View style={styles.container}>
+        <TypePill />
         <View style={styles.chipRow}>
           <View style={styles.chip}>
             <Text style={styles.chipText}>{chipTitle}</Text>
@@ -135,9 +169,11 @@ export function AddToDayInput({
     );
   }
 
-  // Text mode
+  // ── Text mode ─────────────────────────────────────────────────────────────
+
   return (
     <View style={styles.container}>
+      <TypePill />
       <View style={styles.inputRow}>
         <View style={styles.textShell}>
           <TextInput
@@ -150,7 +186,6 @@ export function AddToDayInput({
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
             onBlur={() => {
-              // Small delay so dropdown taps register before hiding.
               setTimeout(() => {
                 if (textValue.trim()) {
                   handleSubmit();

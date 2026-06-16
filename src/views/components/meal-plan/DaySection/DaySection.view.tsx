@@ -21,7 +21,6 @@ export interface DaySectionProps {
   suggestionSlots: SuggestionSlot[];
   pendingActions: AdaptationIntent[];
   savedRecipes: Recipe[];
-  // Resolves a recipeId to a title for display. null = not yet loaded.
   resolveRecipeTitle: (recipeId: string) => string | null;
   onAddSlot: (date: string, type: MealSlotType, input: SlotInput) => void;
   onRemoveSlot: (slotId: string) => void;
@@ -29,9 +28,6 @@ export interface DaySectionProps {
   onRejectSuggestion: (id: string) => void;
   onSuggest?: (date: string, type: MealSlotType) => void;
 }
-
-// Default slot type for new entries — most common meal.
-const DEFAULT_SLOT_TYPE: MealSlotType = "dinner";
 
 export function DaySection({
   date,
@@ -98,11 +94,10 @@ export function DaySection({
         <View style={styles.addRow}>
           <AddToDayInput
             date={date}
-            type={DEFAULT_SLOT_TYPE}
             recipes={savedRecipes}
-            onSubmit={(input) => onAddSlot(date, DEFAULT_SLOT_TYPE, input)}
+            onSubmit={(type, input) => onAddSlot(date, type, input)}
             onSuggest={
-              onSuggest ? () => onSuggest(date, DEFAULT_SLOT_TYPE) : undefined
+              onSuggest ? () => onSuggest(date, "dinner") : undefined
             }
           />
         </View>

@@ -140,6 +140,25 @@ export const styles = StyleSheet.create({
     color: colors.text.inverse,
   },
 
+  // ── Meal type selector ───────────────────────────────────────────────────
+
+  typeSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.background.muted,
+  },
+
+  typeSelectorText: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.secondary,
+  },
+
   // ── Trigger ──────────────────────────────────────────────────────────────
 
   addTrigger: {

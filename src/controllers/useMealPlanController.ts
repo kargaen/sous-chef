@@ -14,6 +14,7 @@ import type {
 } from "../models/types";
 import { buildMealPlanningPrompt, buildSystemPrompt } from "../prompts";
 import { HabitService } from "../services/HabitService";
+import { InspirationService } from "../services/InspirationService";
 import { LLMService } from "../services/LLMService";
 import { SeasonalService } from "../services/SeasonalService";
 import { useChefProfileStore } from "../store/chefProfileStore";
@@ -22,7 +23,7 @@ import {
   matchIngredient,
   normalizeIngredientName,
 } from "../utils/ingredientMatcher";
-import { addDays, planStart, todayKey } from "../utils/planDateUtils";
+import { addDays, formatDayLabel, planStart, todayKey } from "../utils/planDateUtils";
 
 const mealPlanRepo = new MealPlanRepository();
 const recipeRepo = new RecipeRepository();
@@ -289,12 +290,25 @@ export const useMealPlanController = () => {
     });
   };
 
-  // Stub — wired to InspirationService in P2.3.
+  // P2.3: generates one contextual meal idea for a slot.
+  // Reuses the spark generation pipeline; returns the first suggestion title
+  // or empty string on failure. The caller adds it to draftSlots as a
+  // suggestion chip — nothing is persisted here.
   const suggestForSlot = async (
-    _date: string,
-    _type: MealSlotType,
+    date: string,
+    type: MealSlotType,
   ): Promise<string> => {
-    return "";
+    try {
+      const dayLabel = formatDayLabel(date);
+      const results = await InspirationService.generateMore({
+        mode: "freeText",
+        intent: `${type} idea for ${dayLabel}`,
+        produce: [],
+      });
+      return results[0]?.title ?? "";
+    } catch {
+      return "";
+    }
   };
 
   // ─── P8 Plan shifting & lifecycle ────────────────────────────────────────
