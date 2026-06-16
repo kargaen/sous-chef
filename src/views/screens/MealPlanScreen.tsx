@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -27,6 +27,8 @@ export default function MealPlanScreen() {
   const [lastRequest, setLastRequest] = useState<string | null>(null);
   const [savePresetName, setSavePresetName] = useState("");
   const [showSavePreset, setShowSavePreset] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const todayY = useRef(0);
 
   const currentStartDate = planStart(ctrl.weekStartDay);
 
@@ -175,6 +177,7 @@ export default function MealPlanScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={screenStyles.screen}
       contentContainerStyle={[
         screenStyles.scrollContent,
@@ -184,15 +187,28 @@ export default function MealPlanScreen() {
       keyboardShouldPersistTaps="handled"
     >
       {/* Header */}
-      <View style={screenStyles.header}>
-        <Text style={textStyles.eyebrow}>Meal Plan</Text>
-        <Text style={textStyles.screenTitleCompact} numberOfLines={1}>
-          {plan
-            ? formatDayLabel(plan.weekStartDate).replace(/\w+\s/, "") +
-              " – " +
-              formatDayLabel(days[days.length - 1] ?? plan.weekStartDate).replace(/\w+\s/, "")
-            : "This week"}
-        </Text>
+      <View style={styles.planHeaderRow}>
+        <View style={screenStyles.header}>
+          <Text style={textStyles.eyebrow}>Meal Plan</Text>
+          <Text style={textStyles.screenTitleCompact} numberOfLines={1}>
+            {plan
+              ? formatDayLabel(plan.weekStartDate).replace(/\w+\s/, "") +
+                " – " +
+                formatDayLabel(days[days.length - 1] ?? plan.weekStartDate).replace(/\w+\s/, "")
+              : "This week"}
+          </Text>
+        </View>
+        {plan && activeDays.includes(today) ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Jump to today"
+            onPress={() => scrollRef.current?.scrollTo({ y: todayY.current, animated: true })}
+            style={styles.todayChip}
+          >
+            <Feather name="arrow-down" size={11} color={colors.brand.terracotta} />
+            <Text style={styles.todayChipText}>Today</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Nudge settings */}
@@ -294,23 +310,31 @@ export default function MealPlanScreen() {
 
       {/* Active days */}
       {activeDays.map((date) => (
-        <DaySection
+        <View
           key={date}
-          date={date}
-          dateLabel={formatDayLabel(date)}
-          isToday={date === today}
-          slots={slotsForDay(date)}
-          suggestionSlots={suggestionsForDay(date)}
-          pendingActions={ctrl.pendingActions}
-          savedRecipes={ctrl.savedRecipes}
-          resolveRecipeTitle={resolveRecipeTitle}
-          onAddSlot={handleAddSlot}
-          onRemoveSlot={ctrl.removeSlot}
-          onMarkCooked={ctrl.markSlotCooked}
-          onAcceptSuggestion={handleAcceptSuggestion}
-          onRejectSuggestion={ctrl.removeSuggestionSlot}
-          onSuggest={handleSuggest}
-        />
+          onLayout={
+            date === today
+              ? (e) => { todayY.current = e.nativeEvent.layout.y; }
+              : undefined
+          }
+        >
+          <DaySection
+            date={date}
+            dateLabel={formatDayLabel(date)}
+            isToday={date === today}
+            slots={slotsForDay(date)}
+            suggestionSlots={suggestionsForDay(date)}
+            pendingActions={ctrl.pendingActions}
+            savedRecipes={ctrl.savedRecipes}
+            resolveRecipeTitle={resolveRecipeTitle}
+            onAddSlot={handleAddSlot}
+            onRemoveSlot={ctrl.removeSlot}
+            onMarkCooked={ctrl.markSlotCooked}
+            onAcceptSuggestion={handleAcceptSuggestion}
+            onRejectSuggestion={ctrl.removeSuggestionSlot}
+            onSuggest={handleSuggest}
+          />
+        </View>
       ))}
 
       {/* Extend plan */}
@@ -332,6 +356,31 @@ export default function MealPlanScreen() {
 const styles = StyleSheet.create({
   centered: {
     justifyContent: "center",
+  },
+
+  planHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+
+  todayChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand.terracotta,
+    marginBottom: spacing.xs,
+  },
+
+  todayChipText: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.brand.terracotta,
   },
 
   emptyWrap: {
