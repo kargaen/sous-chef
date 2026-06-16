@@ -128,6 +128,7 @@ const buildPantryItem = (draft: PantryItemDraft, id: string): PantryItem => {
     unit: draft.unit.trim() || "unit",
     storageZone: draft.storageZone,
     expiryDate: normaliseExpiryDate(draft.expiryDate),
+    createdDate: normaliseExpiryDate(draft.createdDate),
   });
 };
 

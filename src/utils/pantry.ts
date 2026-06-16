@@ -8,6 +8,7 @@ export interface PantryItemDraft {
   unit: string;
   storageZone: StorageZone | "";
   expiryDate: string;
+  createdDate: string; // YYYY-MM-DD, for homemade items
 }
 
 export const STORAGE_ZONE_LABELS: Record<StorageZone, string> = {
@@ -24,6 +25,7 @@ export const EMPTY_PANTRY_ITEM_DRAFT: PantryItemDraft = {
   unit: "",
   storageZone: "",
   expiryDate: "",
+  createdDate: "",
 };
 
 const parseDateValue = (value?: string): number | null => {
@@ -83,5 +85,6 @@ export const toPantryItemDraft = (item: PantryItem): PantryItemDraft => {
     unit: item.unit,
     storageZone: item.storageZone,
     expiryDate: item.expiryDate ?? "",
+    createdDate: item.createdDate ?? "",
   };
 };

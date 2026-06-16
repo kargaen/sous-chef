@@ -20,6 +20,8 @@ interface AddPantryItemFormProps {
   onDelete?: () => void;
   onMarkUsed?: () => void;
   onLogWaste?: () => void;
+  onSuggestShelfLife?: () => void;
+  suggestingShelfLife?: boolean;
   loading?: boolean;
   errorText?: string | null;
 }
@@ -33,6 +35,8 @@ export function AddPantryItemForm({
   onDelete,
   onMarkUsed,
   onLogWaste,
+  onSuggestShelfLife,
+  suggestingShelfLife = false,
   loading = false,
   errorText,
 }: AddPantryItemFormProps) {
@@ -104,6 +108,26 @@ export function AddPantryItemForm({
           autoCapitalize="none"
           helperText="Leave blank if unknown."
         />
+
+        <TextField
+          label="Made on"
+          value={values.createdDate}
+          onChangeText={(value) => updateField("createdDate", value)}
+          placeholder="YYYY-MM-DD"
+          autoCapitalize="none"
+          helperText="For homemade items — fill this to get a shelf life suggestion."
+        />
+
+        {onSuggestShelfLife && values.createdDate ? (
+          <Button
+            label={suggestingShelfLife ? "Suggesting…" : "Suggest expiry from made date"}
+            variant="secondary"
+            size="sm"
+            onPress={onSuggestShelfLife}
+            disabled={suggestingShelfLife || !values.name}
+            loading={suggestingShelfLife}
+          />
+        ) : null}
       </View>
 
       {errorText ? <Text style={textStyles.errorText}>{errorText}</Text> : null}

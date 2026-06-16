@@ -29,6 +29,7 @@ export default function PantryScreen() {
     logWasteForItem,
     removalPrompt,
     clearRemovalPrompt,
+    suggestShelfLife,
     suggestFromPantry,
     swapSuggestion,
     findRecipeForSuggestion,
@@ -53,6 +54,7 @@ export default function PantryScreen() {
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
   const [recipeLoading, setRecipeLoading] = useState(false);
+  const [suggestingShelfLife, setSuggestingShelfLife] = useState(false);
 
   useEffect(() => {
     if (!removalPrompt) return;
@@ -143,6 +145,19 @@ export default function PantryScreen() {
       closeEditor();
       // removalPrompt may be set asynchronously after the LLM responds —
       // the useEffect above will show the Alert when it arrives.
+    }
+  };
+
+  const handleSuggestShelfLife = async () => {
+    if (!formValues.name) return;
+    setSuggestingShelfLife(true);
+    try {
+      const expiryDate = await suggestShelfLife(formValues.name);
+      if (expiryDate) {
+        setFormValues((prev) => ({ ...prev, expiryDate }));
+      }
+    } finally {
+      setSuggestingShelfLife(false);
     }
   };
 
@@ -281,6 +296,10 @@ export default function PantryScreen() {
                 }
               : undefined
           }
+          onSuggestShelfLife={() => {
+            void handleSuggestShelfLife();
+          }}
+          suggestingShelfLife={suggestingShelfLife}
           loading={loading}
           errorText={error}
         />
