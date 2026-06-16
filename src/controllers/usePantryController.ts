@@ -584,6 +584,43 @@ export const usePantryController = () => {
     [],
   );
 
+  // P7 — Saves a cooked dish as pantry leftovers. Uses suggestShelfLife to
+  // derive an expiry date so the cook doesn't have to guess.
+  const saveLeftoversFromCook = useCallback(
+    async (recipeName: string): Promise<boolean> => {
+      const trimmedName = recipeName.trim();
+      if (!trimmedName) return false;
+      setLoading(true);
+      setError(null);
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const expiryDate = await suggestShelfLife(trimmedName);
+        const item: PantryItem = PantryItemSchema.parse({
+          id: `pantry_${Date.now()}`,
+          name: `${trimmedName} leftovers`,
+          quantity: 1,
+          unit: "portion",
+          storageZone: "fridge",
+          expiryDate: expiryDate ?? undefined,
+          createdDate: today,
+          usedCount: 0,
+        });
+        await repo.insert(item);
+        upsertItem(item);
+        HabitService.record("pantry_item_added");
+        await refreshExpiryBuckets();
+        return true;
+      } catch (e) {
+        log.error("Could not save leftovers to pantry", e);
+        setError("Could not save leftovers.");
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [suggestShelfLife, upsertItem, refreshExpiryBuckets],
+  );
+
   const itemViewModels = useMemo(() => {
     return sortPantryItems(items).map(toPantryItemViewModel);
   }, [items]);
@@ -609,6 +646,7 @@ export const usePantryController = () => {
     swapSuggestion,
     generateRecipeFromIdea,
     findRecipeForSuggestion,
+    saveLeftoversFromCook,
     items: itemViewModels,
     wasteAlert,
     loading,
