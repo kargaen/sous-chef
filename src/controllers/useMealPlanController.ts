@@ -331,6 +331,19 @@ export const useMealPlanController = () => {
     });
   };
 
+  const dismissAllSuggestions = (): void => {
+    setDraftSlots([]);
+  };
+
+  const acceptAllSuggestions = async (): Promise<void> => {
+    const slots = [...draftSlots];
+    setDraftSlots([]);
+    for (const s of slots) {
+      const combined = [s.suggestionText, s.note].filter(Boolean).join(" ");
+      await submitSlotInput(s.date, s.type, { rawText: combined });
+    }
+  };
+
   // P2.3: generates one contextual meal idea for a slot.
   // Reuses the spark generation pipeline; returns the first suggestion title
   // or empty string on failure. The caller adds it to draftSlots as a
@@ -561,6 +574,8 @@ export const useMealPlanController = () => {
     addSuggestionSlot,
     removeSuggestionSlot,
     acceptSuggestion,
+    acceptAllSuggestions,
+    dismissAllSuggestions,
     suggestForSlot,
     setSlotServings,
     bumpSlot,

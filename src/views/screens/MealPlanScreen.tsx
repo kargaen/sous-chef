@@ -255,6 +255,33 @@ export default function MealPlanScreen() {
         </View>
       ) : null}
 
+      {/* Suggestion review banner */}
+      {ctrl.draftSlots.length > 0 ? (
+        <View style={styles.reviewBanner}>
+          <Text style={styles.reviewBannerText}>
+            {ctrl.draftSlots.length} suggestion
+            {ctrl.draftSlots.length !== 1 ? "s" : ""} ready to review
+          </Text>
+          <View style={styles.reviewBannerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Accept all suggestions"
+              onPress={() => ctrl.acceptAllSuggestions()}
+              style={styles.reviewAcceptButton}
+            >
+              <Text style={styles.reviewAcceptText}>Accept all</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss all suggestions"
+              onPress={() => ctrl.dismissAllSuggestions()}
+            >
+              <Text style={styles.reviewDismissText}>Dismiss all</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
       {/* Spent days (collapsed summary) */}
       {spentDays.length > 0 ? (
         <View style={styles.spentGroup}>
@@ -484,5 +511,52 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.xs,
     fontWeight: typography.weight.semibold,
     color: colors.text.inverse,
+  },
+
+  // ── Suggestion review banner ───────────────────────────────────────────────
+
+  reviewBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.brand.terracotta,
+    backgroundColor: colors.background.card,
+  },
+
+  reviewBannerText: {
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    color: colors.text.secondary,
+    flex: 1,
+  },
+
+  reviewBannerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+
+  reviewAcceptButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand.terracotta,
+  },
+
+  reviewAcceptText: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.inverse,
+  },
+
+  reviewDismissText: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    color: colors.text.muted,
   },
 });
