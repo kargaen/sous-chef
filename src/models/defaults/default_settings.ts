@@ -9,4 +9,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   skipSafetyLayer1: false,
   weekStartDay: 1,
   defaultPlanLength: 7,
+  pantryNudgeFrequency: "monthly",
 };

@@ -21,6 +21,10 @@ export const AppSettingsSchema = z.object({
     z.literal(4), z.literal(5), z.literal(6),
   ]).optional().default(1),
   defaultPlanLength: z.number().int().positive().optional().default(7),
+  pantryNudgeFrequency: z
+    .enum(["daily", "weekly", "monthly", "rarely"])
+    .optional()
+    .default("monthly"),
 });
 
 export type AppSettingsInput = z.infer<typeof AppSettingsSchema>;
