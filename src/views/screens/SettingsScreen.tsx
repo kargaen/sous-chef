@@ -371,6 +371,61 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.sectionBlock}>
+        <Text style={styles.sectionEyebrow}>Pantry</Text>
+        <Text style={styles.sectionTitle}>Pantry nudges</Text>
+        <Text style={styles.sectionCopy}>
+          Control how often the pantry surfaces forgotten items and suggests
+          what to cook with them.
+        </Text>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Suggestion frequency</Text>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleLabel}>Surface pantry ideas</Text>
+              <View style={styles.toggleOptionsRow}>
+                {view.nudgeFrequencyOptions.map((option) => {
+                  const isActive =
+                    (view.draft.pantryNudgeFrequency ?? "monthly") ===
+                    option.value;
+
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => {
+                        view.updateDraft({
+                          pantryNudgeFrequency: option.value,
+                        });
+                      }}
+                      style={[
+                        styles.optionChip,
+                        isActive ? styles.optionChipActive : null,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.optionChipText,
+                          isActive ? styles.optionChipTextActive : null,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.helperText}>
+                {view.nudgeFrequencyHelperText}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.sectionBlock}>
         <Text style={styles.sectionEyebrow}>Support</Text>
         <Text style={styles.sectionTitle}>Keep the app understandable</Text>
         <Text style={styles.sectionCopy}>

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { spacing } from "@/constants";
+import { colors, spacing, typography } from "@/constants";
 import { usePantryController } from "@/controllers/usePantryController";
+import type { PantrySuggestion } from "@/prompts/pantrySuggestions";
 import { createLogger } from "@/utils/logger";
 import { EMPTY_PANTRY_ITEM_DRAFT } from "@/utils/pantry";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/views/components/pantry";
 import { Button, Divider, Spinner } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
+import { useRouter } from "expo-router";
 
 const logger = createLogger("PantryScreen");
 
@@ -25,12 +27,19 @@ export default function PantryScreen() {
     removeItemById,
     markItemUsed,
     logWasteForItem,
+    removalPrompt,
+    clearRemovalPrompt,
+    suggestFromPantry,
+    swapSuggestion,
+    findRecipeForSuggestion,
+    generateRecipeFromIdea,
     items,
     wasteAlert,
     loading,
     error,
   } = usePantryController();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const [showForm, setShowForm] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -40,6 +49,33 @@ export default function PantryScreen() {
   const [dismissedAlertItemId, setDismissedAlertItemId] = useState<string | null>(
     null,
   );
+  const [suggestions, setSuggestions] = useState<PantrySuggestion[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
+  const [recipeLoading, setRecipeLoading] = useState(false);
+
+  useEffect(() => {
+    if (!removalPrompt) return;
+    Alert.alert(
+      "Remove from pantry?",
+      `You've used "${removalPrompt.name}" — does it need to stay in the pantry, or is it all gone?`,
+      [
+        {
+          text: "Keep it",
+          style: "cancel",
+          onPress: clearRemovalPrompt,
+        },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            clearRemovalPrompt();
+            void removeItemById(removalPrompt.id);
+          },
+        },
+      ],
+    );
+  }, [removalPrompt]);
 
   useEffect(() => {
     logger.info("Pantry screen mounted; loading pantry items");
@@ -102,11 +138,55 @@ export default function PantryScreen() {
 
   const handleMarkUsed = async () => {
     if (!editingItemId) return;
-
     const didMarkUsed = await markItemUsed(editingItemId);
-
     if (didMarkUsed) {
       closeEditor();
+      // removalPrompt may be set asynchronously after the LLM responds —
+      // the useEffect above will show the Alert when it arrives.
+    }
+  };
+
+  const handleSuggest = async () => {
+    setSuggestLoading(true);
+    try {
+      const results = await suggestFromPantry();
+      setSuggestions(results);
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  const handleSwap = async (index: number) => {
+    setSwappingIndex(index);
+    try {
+      const target = suggestions[index];
+      const replacement = await swapSuggestion(target, suggestions);
+      if (replacement) {
+        setSuggestions((prev) => {
+          const next = [...prev];
+          next[index] = replacement;
+          return next;
+        });
+      }
+    } finally {
+      setSwappingIndex(null);
+    }
+  };
+
+  const handleCookSuggestion = async (suggestion: PantrySuggestion) => {
+    setRecipeLoading(true);
+    try {
+      const existingId = await findRecipeForSuggestion(suggestion);
+      if (existingId) {
+        router.push(`/recipe/${existingId}`);
+        return;
+      }
+      const recipe = await generateRecipeFromIdea(suggestion);
+      if (recipe) {
+        router.push(`/recipe/${recipe.id}`);
+      }
+    } finally {
+      setRecipeLoading(false);
     }
   };
 
@@ -160,6 +240,15 @@ export default function PantryScreen() {
             }}
           />
         </View>
+
+        <Button
+          label={suggestLoading ? "Finding ideas…" : "What should I cook?"}
+          variant="secondary"
+          onPress={() => {
+            void handleSuggest();
+          }}
+          disabled={suggestLoading || items.length === 0}
+        />
       </View>
 
       {showForm ? (
@@ -211,6 +300,55 @@ export default function PantryScreen() {
         />
       ) : null}
 
+      {suggestions.length > 0 ? (
+        <View style={suggestionStyles.section}>
+          <Text style={textStyles.sectionTitle}>Recipe ideas from your pantry</Text>
+
+          {recipeLoading ? (
+            <Spinner label="Building recipe…" />
+          ) : null}
+
+          {suggestions.map((suggestion, index) => (
+            <View key={suggestion.title} style={suggestionStyles.card}>
+              <View style={suggestionStyles.cardBody}>
+                <Text style={suggestionStyles.cardTitle}>{suggestion.title}</Text>
+                {suggestion.description ? (
+                  <Text style={suggestionStyles.cardDescription}>
+                    {suggestion.description}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={suggestionStyles.cardActions}>
+                <Button
+                  label="Cook this"
+                  size="sm"
+                  onPress={() => {
+                    void handleCookSuggestion(suggestion);
+                  }}
+                  disabled={recipeLoading}
+                />
+                <Button
+                  label={swappingIndex === index ? "Swapping…" : "Swap"}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => {
+                    void handleSwap(index);
+                  }}
+                  disabled={swappingIndex !== null || recipeLoading}
+                />
+              </View>
+            </View>
+          ))}
+
+          <Button
+            label="Clear suggestions"
+            variant="ghost"
+            size="sm"
+            onPress={() => setSuggestions([])}
+          />
+        </View>
+      ) : null}
+
       <Divider />
 
       <View style={screenStyles.list}>
@@ -247,3 +385,41 @@ export default function PantryScreen() {
     </ScrollView>
   );
 }
+
+const suggestionStyles = StyleSheet.create({
+  section: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.sm,
+  },
+
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    backgroundColor: colors.background.card,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+
+  cardBody: {
+    gap: spacing.xs,
+  },
+
+  cardTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.bold,
+    color: colors.text.primary,
+  },
+
+  cardDescription: {
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    color: colors.text.secondary,
+  },
+
+  cardActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+});
