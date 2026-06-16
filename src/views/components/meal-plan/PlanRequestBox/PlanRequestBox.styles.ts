@@ -24,7 +24,42 @@ export const styles = StyleSheet.create({
     color: colors.text.primary,
   },
 
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  pantryToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    backgroundColor: colors.background.card,
+  },
+
+  pantryToggleActive: {
+    borderColor: colors.brand.terracotta,
+    backgroundColor: colors.background.muted,
+  },
+
+  pantryToggleText: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.muted,
+  },
+
+  pantryToggleTextActive: {
+    color: colors.brand.terracotta,
+  },
+
   button: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

@@ -118,7 +118,9 @@ export default function MealPlanScreen() {
       {/* AI request box */}
       <PlanRequestBox
         loading={ctrl.loading}
-        onSubmit={(request) => ctrl.generateFromRequest(request)}
+        onSubmit={(request, usePantry) =>
+          ctrl.generateFromRequest(request, usePantry)
+        }
       />
 
       {/* Spent days (collapsed summary) */}

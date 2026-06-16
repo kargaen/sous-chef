@@ -18,6 +18,7 @@ export interface PlanDraftContext {
   region: string | null;
   cuisinePreferences: string[];
   skillLevel: string | null;
+  pantryHighlights?: string[];
 }
 
 export interface DraftedSlot {
@@ -53,6 +54,7 @@ Rules:
 - Avoid repeating the same protein or cuisine two days running.
 - Respect any diet, allergy, or preference the cook mentions.
 - Keep meals practical; vary by season and cook's region.
+- If pantryHighlights are provided, prioritise using those ingredients in the week's meals.
 - Return ONLY the JSON array.
 `.trim();
 
@@ -64,6 +66,9 @@ export const buildPlanDraftUserMessage = (ctx: PlanDraftContext): string =>
     region: ctx.region,
     cuisinePreferences: ctx.cuisinePreferences,
     skillLevel: ctx.skillLevel,
+    ...(ctx.pantryHighlights?.length
+      ? { pantryHighlights: ctx.pantryHighlights }
+      : {}),
   });
 
 // Tolerant parser: ignores any items that don't have the required shape.

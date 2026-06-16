@@ -31,9 +31,12 @@ import {
 } from "../utils/ingredientMatcher";
 import { addDays, eachPlanDay, formatDayLabel, planStart, todayKey } from "../utils/planDateUtils";
 
+import { PantryRepository } from "../models/repositories/PantryRepository";
+
 const mealPlanRepo = new MealPlanRepository();
 const recipeRepo = new RecipeRepository();
 const shoppingRepo = new ShoppingListRepository();
+const pantryRepo = new PantryRepository();
 
 // Patterns that signal a servings quantity in free text.
 const SERVINGS_PATTERNS = [
@@ -388,7 +391,10 @@ export const useMealPlanController = () => {
   // Generate a draft plan from a free-text request. Every LLM result lands as
   // a SuggestionSlot in draftSlots (transient). Nothing is persisted here —
   // the user accepts/dismisses each suggestion individually.
-  const generateFromRequest = async (request: string): Promise<void> => {
+  const generateFromRequest = async (
+    request: string,
+    usePantry = false,
+  ): Promise<void> => {
     if (!activePlan || !request.trim()) return;
     setLoading(true);
     try {
@@ -397,6 +403,14 @@ export const useMealPlanController = () => {
         .filter((d) => d >= today)
         .map((date) => ({ date, label: formatDayLabel(date) }));
 
+      let pantryHighlights: string[] | undefined;
+      if (usePantry) {
+        const pantryItems = await pantryRepo.getAll();
+        pantryHighlights = pantryItems
+          .slice(0, 12)
+          .map((p) => `${p.name}${p.quantity ? ` (${p.quantity} ${p.unit})` : ""}`);
+      }
+
       const message = buildPlanDraftUserMessage({
         request: request.trim(),
         days,
@@ -404,6 +418,7 @@ export const useMealPlanController = () => {
         region: profile?.region ?? null,
         cuisinePreferences: profile?.cuisinePreferences ?? [],
         skillLevel: profile?.skillLevel ?? null,
+        pantryHighlights,
       });
 
       const response = await LLMService.send({
