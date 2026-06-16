@@ -25,6 +25,7 @@ export interface DaySectionProps {
   onAddSlot: (date: string, type: MealSlotType, input: SlotInput) => void;
   onRemoveSlot: (slotId: string) => void;
   onMarkCooked?: (slotId: string) => void;
+  onAdapt?: (slotId: string, description: string) => void;
   onAcceptSuggestion: (slot: SuggestionSlot) => void;
   onRejectSuggestion: (id: string) => void;
   onSuggest?: (date: string, type: MealSlotType) => void;
@@ -42,6 +43,7 @@ export function DaySection({
   onAddSlot,
   onRemoveSlot,
   onMarkCooked,
+  onAdapt,
   onAcceptSuggestion,
   onRejectSuggestion,
   onSuggest,
@@ -79,6 +81,7 @@ export function DaySection({
               pendingActions={pendingActions}
               onRemove={onRemoveSlot}
               onMarkCooked={onMarkCooked}
+              onAdapt={onAdapt}
             />
           </View>
         ))}

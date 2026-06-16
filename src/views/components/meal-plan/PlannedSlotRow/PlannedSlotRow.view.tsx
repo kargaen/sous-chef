@@ -21,6 +21,7 @@ export interface PlannedSlotRowProps {
   pendingActions: AdaptationIntent[];
   onRemove: (slotId: string) => void;
   onMarkCooked?: (slotId: string) => void;
+  onAdapt?: (slotId: string, description: string) => void;
 }
 
 export function PlannedSlotRow({
@@ -29,6 +30,7 @@ export function PlannedSlotRow({
   pendingActions,
   onRemove,
   onMarkCooked,
+  onAdapt,
 }: PlannedSlotRowProps) {
   const hasRecipe = !!slot.recipeId && !!recipeTitle;
   const scaleMultiplier =
@@ -62,14 +64,30 @@ export function PlannedSlotRow({
         ) : null}
 
         {!isCooked
-          ? slotActions.map((action, i) => (
-              <View key={`${action.slotId}-${i}`} style={styles.adaptationBadge}>
-                <Feather name="zap" size={10} color={colors.brand.copper} />
-                <Text style={styles.adaptationBadgeText}>
-                  Adapt: {action.description}
-                </Text>
-              </View>
-            ))
+          ? slotActions.map((action, i) =>
+              onAdapt && action.description ? (
+                <Pressable
+                  key={`${action.slotId}-${i}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Apply adaptation: ${action.description}`}
+                  hitSlop={8}
+                  onPress={() => onAdapt(slot.id, action.description!)}
+                  style={styles.adaptationBadge}
+                >
+                  <Feather name="zap" size={10} color={colors.brand.copper} />
+                  <Text style={styles.adaptationBadgeText}>
+                    Adapt: {action.description}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View key={`${action.slotId}-${i}`} style={styles.adaptationBadge}>
+                  <Feather name="zap" size={10} color={colors.brand.copper} />
+                  <Text style={styles.adaptationBadgeText}>
+                    Adapt: {action.description}
+                  </Text>
+                </View>
+              )
+            )
           : null}
       </View>
 

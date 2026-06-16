@@ -330,6 +330,7 @@ export default function MealPlanScreen() {
             onAddSlot={handleAddSlot}
             onRemoveSlot={ctrl.removeSlot}
             onMarkCooked={ctrl.markSlotCooked}
+            onAdapt={ctrl.applyPendingAdaptation}
             onAcceptSuggestion={handleAcceptSuggestion}
             onRejectSuggestion={ctrl.removeSuggestionSlot}
             onSuggest={handleSuggest}
