@@ -5,8 +5,11 @@ import { PantryRepository } from "../models/repositories/PantryRepository";
 import { PantryItemSchema } from "../models/schemas/PantrySchema";
 import { STORAGE_ZONES, type PantryItem, type StorageZone } from "../models/types";
 import { HabitService } from "../services/HabitService";
+import { LLMService } from "../services/LLMService";
 import { WasteService } from "../services/WasteService";
+import { useChefProfileStore } from "../store/chefProfileStore";
 import { usePantryStore } from "../store/pantryStore";
+import { buildSystemPrompt } from "../prompts";
 import {
   formatPantryQuantity,
   getDaysUntilExpiry,
@@ -30,6 +33,8 @@ export interface PantryItemViewModel {
   zone: StorageZone;
   expiryStatus: PantryExpiryStatus;
   expiryLabel: string;
+  createdLabel?: string;
+  usedCount: number;
   draft: PantryItemDraft;
 }
 
@@ -122,6 +127,15 @@ const sortPantryItems = (items: PantryItem[]): PantryItem[] => {
   });
 };
 
+const getCreatedLabel = (createdDate?: string): string | undefined => {
+  if (!createdDate) return undefined;
+  const created = new Date(`${createdDate}T00:00:00`);
+  const days = Math.floor((Date.now() - created.getTime()) / 86_400_000);
+  if (days <= 0) return "made today";
+  if (days === 1) return "made yesterday";
+  return `made ${days} days ago`;
+};
+
 const toPantryItemViewModel = (item: PantryItem): PantryItemViewModel => {
   return {
     id: item.id,
@@ -130,6 +144,8 @@ const toPantryItemViewModel = (item: PantryItem): PantryItemViewModel => {
     zone: item.storageZone,
     expiryStatus: getPantryExpiryStatus(item.expiryDate),
     expiryLabel: getPantryExpiryLabel(item.expiryDate),
+    createdLabel: getCreatedLabel(item.createdDate),
+    usedCount: item.usedCount ?? 0,
     draft: toPantryItemDraft(item),
   };
 };
@@ -157,6 +173,7 @@ export const usePantryController = () => {
   const [expiringSoon, setExpiringSoon] = useState<PantryItem[]>([]);
   const [expiredItems, setExpiredItems] = useState<PantryItem[]>([]);
 
+  const profile = useChefProfileStore((s) => s.profile);
   const items = usePantryStore((state) => state.items);
   const setItems = usePantryStore((state) => state.setItems);
   const upsertItem = usePantryStore((state) => state.upsertItem);
@@ -293,6 +310,33 @@ export const usePantryController = () => {
     [upsertItem],
   );
 
+  // Asks the LLM how long a homemade item typically keeps in the fridge.
+  // Returns a suggested YYYY-MM-DD expiry date, or null on failure.
+  const suggestShelfLife = useCallback(
+    async (itemName: string): Promise<string | null> => {
+      if (!profile) return null;
+      try {
+        const response = await LLMService.send({
+          system: buildSystemPrompt(profile),
+          messages: [
+            {
+              role: "user",
+              content: `How many days does homemade ${itemName.trim()} typically last when refrigerated? Reply with only a positive integer — no other text.`,
+            },
+          ],
+        });
+        const days = parseInt(response.content.trim(), 10);
+        if (!Number.isFinite(days) || days <= 0) return null;
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + days);
+        return expiry.toISOString().slice(0, 10);
+      } catch {
+        return null;
+      }
+    },
+    [profile],
+  );
+
   const logWasteForItem = useCallback(
     async (id: string, reason = "discarded"): Promise<boolean> => {
       setLoading(true);
@@ -339,6 +383,7 @@ export const usePantryController = () => {
     removeItemById,
     markItemUsed,
     logWasteForItem,
+    suggestShelfLife,
     items: itemViewModels,
     wasteAlert,
     loading,
