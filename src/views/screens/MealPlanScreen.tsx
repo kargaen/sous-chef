@@ -1,9 +1,9 @@
 import { Feather } from "@expo/vector-icons";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, spacing } from "@/constants";
+import { colors, radius, spacing, typography } from "@/constants";
 import { useMealPlanController } from "@/controllers/useMealPlanController";
 import type { MealSlotType, SlotInput, SuggestionSlot } from "@/models/types";
 import { Button } from "@/views/components/ui";
@@ -20,6 +20,7 @@ import {
 export default function MealPlanScreen() {
   const insets = useSafeAreaInsets();
   const ctrl = useMealPlanController();
+  const [planDayCount, setPlanDayCount] = useState(ctrl.defaultPlanLength);
 
   const currentStartDate = planStart(ctrl.weekStartDay);
 
@@ -66,11 +67,51 @@ export default function MealPlanScreen() {
             Plan your week, one day at a time. Add meals by hand or let Sous
             Chef draft the whole week for you.
           </Text>
+
+          {/* Plan creation form */}
+          <View style={styles.createForm}>
+            <View style={styles.createRow}>
+              <Text style={styles.createLabel}>Starting</Text>
+              <Text style={styles.createValue}>
+                {formatDayLabel(currentStartDate)}
+              </Text>
+            </View>
+
+            <View style={styles.createRow}>
+              <Text style={styles.createLabel}>Length</Text>
+              <View style={styles.stepperRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Fewer days"
+                  onPress={() =>
+                    setPlanDayCount((n) => Math.max(1, n - 1))
+                  }
+                  style={styles.stepperButton}
+                >
+                  <Feather name="minus" size={14} color={colors.text.secondary} />
+                </Pressable>
+                <Text style={styles.stepperValue}>
+                  {planDayCount} {planDayCount === 1 ? "day" : "days"}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="More days"
+                  onPress={() =>
+                    setPlanDayCount((n) => Math.min(30, n + 1))
+                  }
+                  style={styles.stepperButton}
+                >
+                  <Feather name="plus" size={14} color={colors.text.secondary} />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
           <Button
-            label="Create this week's plan"
+            label="Create Plan"
             variant="primary"
             onPress={async () => {
-              await ctrl.createPlan(currentStartDate);
+              await ctrl.createPlan(currentStartDate, planDayCount);
             }}
           />
         </View>
@@ -176,6 +217,64 @@ const styles = StyleSheet.create({
 
   emptyWrap: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.xl,
+  },
+
+  createForm: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    backgroundColor: colors.background.card,
+    overflow: "hidden",
+  },
+
+  createRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+
+  createLabel: {
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    color: colors.text.muted,
+  },
+
+  createValue: {
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.primary,
+  },
+
+  stepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  stepperButton: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background.card,
+  },
+
+  stepperValue: {
+    width: 64,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.primary,
+    textAlign: "center",
   },
 
   spentGroup: {
