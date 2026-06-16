@@ -9,7 +9,7 @@ import type { MealSlotType, SlotInput, SuggestionSlot } from "@/models/types";
 import { Button } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
 
-import { DaySection, PlanRequestBox } from "../components/meal-plan";
+import { DaySection, NudgeSettingsInline, PlanRequestBox } from "../components/meal-plan";
 import {
   eachPlanDay,
   formatDayLabel,
@@ -155,6 +155,9 @@ export default function MealPlanScreen() {
             : "This week"}
         </Text>
       </View>
+
+      {/* Nudge settings */}
+      <NudgeSettingsInline />
 
       {/* AI request box */}
       <PlanRequestBox

@@ -49,7 +49,7 @@ export default function ShoppingListScreen() {
     if (!plan) return;
     ctrl.deriveShoppingList(plan.weekStartDate, scopedDates);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, plan?.id]);
+  }, [scope, plan?.id, plan?.slots.length]);
 
   if (!plan) {
     return (

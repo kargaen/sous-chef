@@ -1,6 +1,8 @@
 export { AddToDayInput } from "./AddToDayInput";
 export type { AddToDayInputProps } from "./AddToDayInput";
 
+export { NudgeSettingsInline } from "./NudgeSettingsInline";
+
 export { PlanRequestBox } from "./PlanRequestBox";
 export type { PlanRequestBoxProps } from "./PlanRequestBox";
 
