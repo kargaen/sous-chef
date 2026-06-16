@@ -10,7 +10,7 @@ import { WasteService } from "../services/WasteService";
 import { useChefProfileStore } from "../store/chefProfileStore";
 import { usePantryStore } from "../store/pantryStore";
 import { useSettingsStore } from "../store/settingsStore";
-import { buildSystemPrompt } from "../prompts";
+import { buildRecipeImportPrompt, buildSystemPrompt } from "../prompts";
 import {
   PANTRY_SUGGESTION_SYSTEM_PROMPT,
   buildPantrySuggestionsPrompt,
@@ -19,6 +19,10 @@ import {
   type PantrySuggestion,
 } from "../prompts/pantrySuggestions";
 import { RecipeRepository } from "../models/repositories/RecipeRepository";
+import {
+  buildRecipeFromInput,
+  parseRecipeDraftFromLLM,
+} from "../utils/recipeBuilder";
 import {
   formatPantryQuantity,
   getDaysUntilExpiry,
@@ -532,6 +536,38 @@ export const usePantryController = () => {
     [profile],
   );
 
+  // P5.5 — Generates a full recipe from a pantry suggestion and saves it.
+  // Uses the existing recipe import pipeline (sourceMode: "idea").
+  // Returns the saved Recipe, or null on LLM/parse failure.
+  const generateRecipeFromIdea = useCallback(
+    async (suggestion: PantrySuggestion): Promise<import("../models/types").Recipe | null> => {
+      if (!profile) return null;
+      try {
+        const source = suggestion.description
+          ? `${suggestion.title} — ${suggestion.description}`
+          : suggestion.title;
+
+        const response = await LLMService.send({
+          system: buildSystemPrompt(profile),
+          messages: [
+            {
+              role: "user",
+              content: buildRecipeImportPrompt({ sourceMode: "idea", source }),
+            },
+          ],
+        });
+
+        const draft = parseRecipeDraftFromLLM(response.content);
+        const recipe = buildRecipeFromInput(draft);
+        await recipeRepo.save(recipe);
+        return recipe;
+      } catch {
+        return null;
+      }
+    },
+    [profile],
+  );
+
   // P5.4 — Fuzzy-matches a suggestion title against saved recipes.
   // Returns the first match above a basic similarity threshold, or null.
   const findRecipeForSuggestion = useCallback(
@@ -571,6 +607,7 @@ export const usePantryController = () => {
     markItemsSurfaced,
     suggestFromPantry,
     swapSuggestion,
+    generateRecipeFromIdea,
     findRecipeForSuggestion,
     items: itemViewModels,
     wasteAlert,

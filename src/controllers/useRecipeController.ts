@@ -2,7 +2,15 @@ import { useState } from "react";
 import { CookLogRepository } from "../models/repositories/CookLogRepository";
 import type { RecipeCookStats } from "../models/repositories/CookLogRepository";
 import { RecipeRepository } from "../models/repositories/RecipeRepository";
-import type { Ingredient, Recipe, Step } from "../models/types";
+import type { Recipe } from "../models/types";
+import {
+  type RecipeBuilderInput,
+  buildRecipeFromInput,
+  createRecipeId,
+  parseIngredientLine,
+  parseRecipeDraftFromLLM,
+  parseStepLine,
+} from "../utils/recipeBuilder";
 import {
   buildRatingDimensionsPrompt,
   buildRecipeImportPrompt,
@@ -18,29 +26,6 @@ import { useSousChefCompanionStore } from "../store/sousChefCompanionStore";
 
 const repo = new RecipeRepository();
 const cookLogRepo = new CookLogRepository();
-
-interface RecipeDraftInput {
-  categoryId?: string | null;
-  title: string;
-  ingredientsText: string;
-  stepsText: string;
-  notes?: string;
-  servings?: number;
-  prepMinutes?: number;
-  cookMinutes?: number;
-  estimatedCost?: number;
-}
-
-interface ImportedRecipeDraft {
-  title: string;
-  ingredientsText: string;
-  stepsText: string;
-  notes: string;
-  servings?: number;
-  prepMinutes?: number;
-  cookMinutes?: number;
-  estimatedCost?: number;
-}
 
 interface ImportRecipeSourceInput {
   sourceMode: "url" | "idea" | "paste";
@@ -61,147 +46,6 @@ interface RecipeEditsInput {
   chefsNotes: string;
 }
 
-const createRecipeId = (): string => {
-  return `recipe-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-};
-
-const parseIngredientLine = (line: string, index: number): Ingredient => {
-  const trimmedLine = line.trim();
-  const matchedIngredient = trimmedLine.match(
-    /^(\d+(?:[.,]\d+)?)\s*([^\s]+)\s+(.+)$/,
-  );
-
-  if (!matchedIngredient) {
-    return {
-      id: `ingredient-${index + 1}`,
-      name: trimmedLine,
-      quantity: 1,
-      unit: "item",
-    };
-  }
-
-  return {
-    id: `ingredient-${index + 1}`,
-    name: matchedIngredient[3].trim(),
-    quantity: Number(matchedIngredient[1].replace(",", ".")),
-    unit: matchedIngredient[2].trim(),
-  };
-};
-
-const parseStepLine = (line: string, index: number): Step => {
-  const trimmedLine = line.trim();
-  const cleanedInstruction =
-    trimmedLine.replace(/^\d+[\).\s-]+/, "").trim() || trimmedLine;
-
-  return {
-    order: index + 1,
-    instruction: cleanedInstruction,
-  };
-};
-
-const buildRecipeFromDraft = (draft: RecipeDraftInput): Recipe => {
-  const trimmedTitle = draft.title.trim();
-  const ingredientLines = draft.ingredientsText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const stepLines = draft.stepsText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (!trimmedTitle) {
-    throw new Error("Give the recipe a title before saving.");
-  }
-
-  if (ingredientLines.length === 0) {
-    throw new Error("Add at least one ingredient before saving.");
-  }
-
-  if (stepLines.length === 0) {
-    throw new Error("Add at least one step before saving.");
-  }
-
-  const now = new Date().toISOString();
-  const trimmedNotes = draft.notes?.trim();
-
-  return {
-    id: createRecipeId(),
-    title: trimmedTitle,
-    description: trimmedNotes || `${trimmedTitle} recipe draft`,
-    categoryId: draft.categoryId ?? null,
-    parentId: null,
-    servings:
-      draft.servings && draft.servings > 0 ? Math.round(draft.servings) : 1,
-    prepMinutes: Math.round(draft.prepMinutes ?? 0),
-    cookMinutes: Math.round(draft.cookMinutes ?? 0),
-    estimatedCost: draft.estimatedCost,
-    ingredients: ingredientLines.map(parseIngredientLine),
-    steps: stepLines.map(parseStepLine),
-    chefsNotes: trimmedNotes || undefined,
-    tags: [],
-    createdDate: now,
-    lastUpdatedDate: now,
-  };
-};
-
-const stripJsonFences = (value: string): string =>
-  value
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-
-// Coerce an LLM-provided value to a positive number, or undefined. Keeps
-// imported recipes from defaulting every metric to 0 / "Flexible".
-const toOptionalNumber = (value: unknown): number | undefined => {
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-};
-
-const parseImportedRecipeDraft = (content: string): ImportedRecipeDraft => {
-  const parsed = JSON.parse(stripJsonFences(content)) as {
-    title?: unknown;
-    ingredients?: unknown;
-    steps?: unknown;
-    notes?: unknown;
-    servings?: unknown;
-    prepMinutes?: unknown;
-    cookMinutes?: unknown;
-    estimatedCost?: unknown;
-  };
-
-  const title =
-    typeof parsed.title === "string" ? parsed.title.trim() : "";
-  const ingredients = Array.isArray(parsed.ingredients)
-    ? parsed.ingredients
-        .filter((value): value is string => typeof value === "string")
-        .map((value) => value.trim())
-        .filter(Boolean)
-    : [];
-  const steps = Array.isArray(parsed.steps)
-    ? parsed.steps
-        .filter((value): value is string => typeof value === "string")
-        .map((value) => value.trim())
-        .filter(Boolean)
-    : [];
-  const notes =
-    typeof parsed.notes === "string" ? parsed.notes.trim() : "";
-
-  if (!title || ingredients.length === 0 || steps.length === 0) {
-    throw new Error("Imported recipe draft was incomplete.");
-  }
-
-  return {
-    title,
-    ingredientsText: ingredients.join("\n"),
-    stepsText: steps.join("\n"),
-    notes,
-    servings: toOptionalNumber(parsed.servings),
-    prepMinutes: toOptionalNumber(parsed.prepMinutes),
-    cookMinutes: toOptionalNumber(parsed.cookMinutes),
-    estimatedCost: toOptionalNumber(parsed.estimatedCost),
-  };
-};
 
 export const useRecipeController = () => {
   const [loading, setLoading] = useState(false);
@@ -360,10 +204,10 @@ export const useRecipeController = () => {
   };
 
   const saveDraftRecipe = async (
-    draft: RecipeDraftInput,
+    draft: RecipeBuilderInput,
   ): Promise<Recipe | null> => {
     try {
-      return await saveRecipe(buildRecipeFromDraft(draft));
+      return await saveRecipe(buildRecipeFromInput(draft));
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Could not save recipe.",
@@ -425,9 +269,9 @@ export const useRecipeController = () => {
   };
 
   const refineDraft = async (
-    current: ImportedRecipeDraft,
+    current: RecipeBuilderInput,
     request: string,
-  ): Promise<ImportedRecipeDraft | null> => {
+  ): Promise<RecipeBuilderInput | null> => {
     if (!profile) return null;
 
     try {
@@ -454,7 +298,7 @@ Apply the requested change and return the full updated recipe.`,
         ],
       });
 
-      return parseImportedRecipeDraft(response.content);
+      return parseRecipeDraftFromLLM(response.content);
     } catch {
       setError("Could not refine the draft right now.");
       return null;
@@ -464,7 +308,7 @@ Apply the requested change and return the full updated recipe.`,
   const importRecipeSource = async ({
     sourceMode,
     source,
-  }: ImportRecipeSourceInput): Promise<ImportedRecipeDraft | null> => {
+  }: ImportRecipeSourceInput): Promise<RecipeBuilderInput | null> => {
     const trimmedSource = source.trim();
 
     if (!trimmedSource) {
@@ -522,7 +366,7 @@ Apply the requested change and return the full updated recipe.`,
         ],
       });
 
-      return parseImportedRecipeDraft(response.content);
+      return parseRecipeDraftFromLLM(response.content);
     } catch {
       showCompanion(
         "exhausted",
