@@ -205,6 +205,20 @@ export default function PantryScreen() {
     }
   };
 
+  const handleAddToPlan = async (suggestion: PantrySuggestion) => {
+    setRecipeLoading(true);
+    try {
+      const existingId = await findRecipeForSuggestion(suggestion);
+      if (!existingId) {
+        await generateRecipeFromIdea(suggestion);
+      }
+      // Recipe is now saved — navigate to plan where the cook can add it by name
+      router.push({ pathname: "/(tabs)/plan" });
+    } finally {
+      setRecipeLoading(false);
+    }
+  };
+
   const handleLogWaste = async () => {
     if (!editingItemId) return;
 
@@ -347,9 +361,18 @@ export default function PantryScreen() {
                   disabled={recipeLoading}
                 />
                 <Button
-                  label={swappingIndex === index ? "Swapping…" : "Swap"}
+                  label="Add to plan"
                   size="sm"
                   variant="secondary"
+                  onPress={() => {
+                    void handleAddToPlan(suggestion);
+                  }}
+                  disabled={recipeLoading}
+                />
+                <Button
+                  label={swappingIndex === index ? "…" : "Swap"}
+                  size="sm"
+                  variant="ghost"
                   onPress={() => {
                     void handleSwap(index);
                   }}
