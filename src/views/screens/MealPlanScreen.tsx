@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, radius, spacing, typography } from "@/constants";
@@ -21,12 +21,27 @@ export default function MealPlanScreen() {
   const insets = useSafeAreaInsets();
   const ctrl = useMealPlanController();
   const [planDayCount, setPlanDayCount] = useState(ctrl.defaultPlanLength);
+  // When a preset is tapped on the empty state, the instructions are queued here
+  // so that generateFromRequest fires automatically once activePlan is set.
+  const [pendingPreset, setPendingPreset] = useState<string | null>(null);
+  const [lastRequest, setLastRequest] = useState<string | null>(null);
+  const [savePresetName, setSavePresetName] = useState("");
+  const [showSavePreset, setShowSavePreset] = useState(false);
 
   const currentStartDate = planStart(ctrl.weekStartDay);
 
   useEffect(() => {
     ctrl.loadPlanForWeek(currentStartDate);
   }, [currentStartDate]);
+
+  // Auto-trigger AI draft after plan is created via a preset.
+  useEffect(() => {
+    if (pendingPreset && ctrl.activePlan) {
+      ctrl.generateFromRequest(pendingPreset).catch(() => {});
+      setPendingPreset(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPreset, ctrl.activePlan?.id]);
 
   // Resolve a recipe title from the controller's already-loaded savedRecipes cache.
   // Slot recipeIds reference saved recipes only, so no extra fetch is needed.
@@ -107,6 +122,30 @@ export default function MealPlanScreen() {
             </View>
           </View>
 
+          {/* Saved presets as quick-start chips */}
+          {ctrl.presets.length > 0 ? (
+            <View style={styles.presetsSection}>
+              <Text style={styles.presetsLabel}>Quick start</Text>
+              <View style={styles.presetsRow}>
+                {ctrl.presets.map((preset) => (
+                  <Pressable
+                    key={preset.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Start plan from preset: ${preset.name}`}
+                    onPress={async () => {
+                      setPendingPreset(preset.instructions);
+                      await ctrl.createPlan(currentStartDate, planDayCount);
+                    }}
+                    style={styles.presetChip}
+                  >
+                    <Feather name="bookmark" size={12} color={colors.brand.terracotta} />
+                    <Text style={styles.presetChipText}>{preset.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           <Button
             label="Create Plan"
             variant="primary"
@@ -162,10 +201,59 @@ export default function MealPlanScreen() {
       {/* AI request box */}
       <PlanRequestBox
         loading={ctrl.loading}
-        onSubmit={(request, usePantry) =>
-          ctrl.generateFromRequest(request, usePantry)
-        }
+        onSubmit={(request, usePantry) => {
+          setLastRequest(request);
+          setShowSavePreset(false);
+          setSavePresetName("");
+          ctrl.generateFromRequest(request, usePantry);
+        }}
       />
+
+      {/* Save as preset (shown after a request is submitted) */}
+      {lastRequest && !showSavePreset ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Save this request as a preset"
+          onPress={() => setShowSavePreset(true)}
+          style={styles.savePresetTrigger}
+        >
+          <Feather name="bookmark" size={12} color={colors.text.muted} />
+          <Text style={styles.savePresetTriggerText}>Save as preset</Text>
+        </Pressable>
+      ) : null}
+
+      {showSavePreset ? (
+        <View style={styles.savePresetForm}>
+          <TextInput
+            style={styles.savePresetInput}
+            value={savePresetName}
+            onChangeText={setSavePresetName}
+            placeholder="Preset name…"
+            placeholderTextColor={colors.text.muted}
+            returnKeyType="done"
+            autoFocus
+            onSubmitEditing={async () => {
+              if (!savePresetName.trim() || !lastRequest) return;
+              await ctrl.savePreset(savePresetName.trim(), lastRequest);
+              setShowSavePreset(false);
+              setSavePresetName("");
+            }}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Save preset"
+            onPress={async () => {
+              if (!savePresetName.trim() || !lastRequest) return;
+              await ctrl.savePreset(savePresetName.trim(), lastRequest);
+              setShowSavePreset(false);
+              setSavePresetName("");
+            }}
+            style={styles.savePresetButton}
+          >
+            <Text style={styles.savePresetButtonText}>Save</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* Spent days (collapsed summary) */}
       {spentDays.length > 0 ? (
@@ -305,5 +393,95 @@ const styles = StyleSheet.create({
   extendText: {
     fontSize: 13,
     color: colors.text.muted,
+  },
+
+  // ── Presets ────────────────────────────────────────────────────────────────
+
+  presetsSection: {
+    gap: spacing.xs,
+  },
+
+  presetsLabel: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+
+  presetsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+
+  presetChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand.terracotta,
+    backgroundColor: colors.background.card,
+  },
+
+  presetChipText: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.brand.terracotta,
+  },
+
+  // ── Save as preset ─────────────────────────────────────────────────────────
+
+  savePresetTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+    alignSelf: "flex-start",
+    paddingVertical: spacing.xs,
+  },
+
+  savePresetTriggerText: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    color: colors.text.muted,
+  },
+
+  savePresetForm: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignItems: "center",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    backgroundColor: colors.background.card,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+
+  savePresetInput: {
+    flex: 1,
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    color: colors.text.primary,
+    paddingVertical: spacing.xs,
+  },
+
+  savePresetButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.brand.terracotta,
+  },
+
+  savePresetButtonText: {
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    fontWeight: typography.weight.semibold,
+    color: colors.text.inverse,
   },
 });

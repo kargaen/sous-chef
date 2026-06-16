@@ -7,6 +7,7 @@ import type {
   AdaptationIntent,
   MealSlot,
   MealSlotType,
+  PlanPreset,
   Recipe,
   SlotInput,
   SuggestionSlot,
@@ -32,11 +33,13 @@ import {
 import { addDays, eachPlanDay, formatDayLabel, planStart, todayKey } from "../utils/planDateUtils";
 
 import { PantryRepository } from "../models/repositories/PantryRepository";
+import { PlanPresetRepository } from "../models/repositories/PlanPresetRepository";
 
 const mealPlanRepo = new MealPlanRepository();
 const recipeRepo = new RecipeRepository();
 const shoppingRepo = new ShoppingListRepository();
 const pantryRepo = new PantryRepository();
+const presetRepo = new PlanPresetRepository();
 
 // Patterns that signal a servings quantity in free text.
 const SERVINGS_PATTERNS = [
@@ -85,6 +88,7 @@ export const useMealPlanController = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
+  const [presets, setPresets] = useState<PlanPreset[]>([]);
 
   const {
     activePlan,
@@ -106,6 +110,7 @@ export const useMealPlanController = () => {
   // Load saved recipes once for typeahead and parseSlotInput matching.
   useEffect(() => {
     recipeRepo.getSaved().then(setSavedRecipes).catch(() => {});
+    presetRepo.listAll().then(setPresets).catch(() => {});
   }, []);
 
   // ─── Internal helpers ────────────────────────────────────────────────────
@@ -386,6 +391,27 @@ export const useMealPlanController = () => {
     setShoppingList(next);
   };
 
+  // ─── P6 Plan presets ─────────────────────────────────────────────────────
+
+  const savePreset = async (name: string, instructions: string): Promise<void> => {
+    const preset: PlanPreset = {
+      id: `preset-${Date.now()}`,
+      name: name.trim(),
+      instructions: instructions.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    const saved = await presetRepo.save(preset);
+    setPresets((prev) => {
+      const without = prev.filter((p) => p.id !== saved.id);
+      return [...without, saved];
+    });
+  };
+
+  const deletePreset = async (id: string): Promise<void> => {
+    await presetRepo.delete(id);
+    setPresets((prev) => prev.filter((p) => p.id !== id));
+  };
+
   // ─── P5 AI plan draft ────────────────────────────────────────────────────
 
   // Generate a draft plan from a free-text request. Every LLM result lands as
@@ -499,6 +525,7 @@ export const useMealPlanController = () => {
     draftSlots,
     pendingActions,
     savedRecipes,
+    presets,
     weekStartDay,
     defaultPlanLength,
     loading,
@@ -521,6 +548,8 @@ export const useMealPlanController = () => {
     deriveShoppingList,
     toggleShoppingItem,
     generateFromRequest,
+    savePreset,
+    deletePreset,
     generatePlan,
   };
 };

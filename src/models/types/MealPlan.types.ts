@@ -47,3 +47,12 @@ export interface PlanPreference {
   servingsPerMeal: number;
   excludeTags: string[];
 }
+
+// A saved plan "theme" — reusable AI request instructions.
+// Stored as a KV blob; never touches the plans table.
+export interface PlanPreset {
+  id: string;
+  name: string;
+  instructions: string;
+  createdAt: string;  // ISO timestamp
+}
