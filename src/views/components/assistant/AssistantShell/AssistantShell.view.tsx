@@ -88,7 +88,7 @@ export function AssistantShell() {
     }
 
     if (action.action === "add_pantry_item") {
-      void addPantryItem({
+      const ok = await addPantryItem({
         name: action.name,
         quantity: action.quantity ?? "1",
         unit: action.unit ?? "unit",
@@ -96,6 +96,10 @@ export function AssistantShell() {
         expiryDate: action.expiryDate ?? "",
         createdDate: action.createdDate ?? "",
       });
+      if (ok) {
+        setSpeechBubbleTone("happy");
+        setSpeechBubble(`Added ${action.name} to your pantry.`);
+      }
     }
   };
 

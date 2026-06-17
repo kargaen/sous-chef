@@ -3,14 +3,15 @@ import { ZodError } from "zod";
 
 import { PantryRepository } from "../models/repositories/PantryRepository";
 import { PantryItemSchema } from "../models/schemas/PantrySchema";
-import { STORAGE_ZONES, type PantryItem, type PantryNudgeFrequency, type StorageZone } from "../models/types";
+import { STORAGE_ZONES, type PantryItem, type PantryNudgeFrequency, type Recipe, type StorageZone } from "../models/types";
 import { HabitService } from "../services/HabitService";
 import { LLMService } from "../services/LLMService";
+import { RecipeImportService } from "../services/RecipeImportService";
 import { WasteService } from "../services/WasteService";
 import { useChefProfileStore } from "../store/chefProfileStore";
 import { usePantryStore } from "../store/pantryStore";
 import { useSettingsStore } from "../store/settingsStore";
-import { buildRecipeImportPrompt, buildSystemPrompt } from "../prompts";
+import { buildSystemPrompt } from "../prompts";
 import {
   PANTRY_SUGGESTION_SYSTEM_PROMPT,
   buildPantrySuggestionsPrompt,
@@ -19,10 +20,6 @@ import {
   type PantrySuggestion,
 } from "../prompts/pantrySuggestions";
 import { RecipeRepository } from "../models/repositories/RecipeRepository";
-import {
-  buildRecipeFromInput,
-  parseRecipeDraftFromLLM,
-} from "../utils/recipeBuilder";
 import {
   formatPantryQuantity,
   getDaysUntilExpiry,
@@ -550,33 +547,16 @@ export const usePantryController = () => {
   );
 
   // P5.5 — Generates a full recipe from a pantry suggestion and saves it.
-  // Uses the existing recipe import pipeline (sourceMode: "idea").
-  // Returns the saved Recipe, or null on LLM/parse failure.
+  // Delegates generation to RecipeImportService; caller saves via recipeRepo.
   const generateRecipeFromIdea = useCallback(
-    async (suggestion: PantrySuggestion): Promise<import("../models/types").Recipe | null> => {
+    async (suggestion: PantrySuggestion): Promise<Recipe | null> => {
       if (!profile) return null;
-      try {
-        const source = suggestion.description
-          ? `${suggestion.title} — ${suggestion.description}`
-          : suggestion.title;
-
-        const response = await LLMService.send({
-          system: buildSystemPrompt(profile),
-          messages: [
-            {
-              role: "user",
-              content: buildRecipeImportPrompt({ sourceMode: "idea", source }),
-            },
-          ],
-        });
-
-        const draft = parseRecipeDraftFromLLM(response.content);
-        const recipe = buildRecipeFromInput(draft);
-        await recipeRepo.save(recipe);
-        return recipe;
-      } catch {
-        return null;
-      }
+      const source = suggestion.description
+        ? `${suggestion.title} — ${suggestion.description}`
+        : suggestion.title;
+      const recipe = await RecipeImportService.generateRecipeFromIdea(source, profile);
+      if (recipe) await recipeRepo.save(recipe);
+      return recipe;
     },
     [profile],
   );
