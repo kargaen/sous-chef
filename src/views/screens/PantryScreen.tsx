@@ -14,7 +14,7 @@ import {
   WasteAlert,
   type AddPantryItemFormValues,
 } from "@/views/components/pantry";
-import { Button, Divider, Spinner } from "@/views/components/ui";
+import { Button, Divider, EmptyState, Spinner } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
 import { useRouter } from "expo-router";
 
@@ -447,10 +447,7 @@ export default function PantryScreen() {
             />
           ))
         ) : (
-          <Text style={textStyles.emptyText}>
-            No pantry items yet. Add a few staples and we can start using them
-            for planning and nudges.
-          </Text>
+          <EmptyState message="No pantry items yet. Add a few staples and we can start using them for planning and nudges." />
         )}
       </View>
     </ScrollView>

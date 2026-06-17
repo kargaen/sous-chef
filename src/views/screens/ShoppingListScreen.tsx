@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, spacing, typography } from "@/constants";
 import { useMealPlanController } from "@/controllers/useMealPlanController";
 import { eachPlanDay, todayKey } from "@/utils/planDateUtils";
+import { EmptyState } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
 
 type Scope = "today" | "3days" | "all";
@@ -153,12 +154,7 @@ export default function ShoppingListScreen() {
 
       {/* Item groups */}
       {ctrl.shoppingList.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Text style={textStyles.emptyText}>
-            Nothing to buy for this scope — add recipe-linked slots to the plan
-            first.
-          </Text>
-        </View>
+        <EmptyState message="Nothing to buy for this scope — add recipe-linked slots to the plan first." />
       ) : (
         ctrl.shoppingList.map((group) => (
           <View key={group.section} style={styles.group}>
@@ -316,10 +312,4 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
 
-  // ── Empty ───────────────────────────────────────────────────────────────
-
-  emptyWrap: {
-    paddingVertical: spacing.xl,
-    alignItems: "center",
-  },
 });
