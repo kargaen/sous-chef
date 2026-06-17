@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, radius, spacing, typography } from "@/constants";
 import { useMealPlanController } from "@/controllers/useMealPlanController";
+import { useRegisterAssistantContext } from "@/controllers";
 import type { MealSlotType, SlotInput, SuggestionSlot } from "@/models/types";
 import { Button } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
@@ -31,6 +32,33 @@ export default function MealPlanScreen() {
   const todayY = useRef(0);
 
   const currentStartDate = planStart(ctrl.weekStartDay);
+
+  useRegisterAssistantContext({
+    scope: { kind: "meal_plan" },
+    promptSuggestions: [
+      {
+        id: "plan-draft",
+        label: "Draft my week",
+        prompt: "Can you draft a week of dinners for me based on my preferences?",
+        kind: "planning",
+        scopeKinds: ["meal_plan"],
+      },
+      {
+        id: "plan-tonight",
+        label: "What's for tonight?",
+        prompt: "Suggest something quick and satisfying for tonight's dinner.",
+        kind: "planning",
+        scopeKinds: ["meal_plan"],
+      },
+      {
+        id: "plan-pantry",
+        label: "Use what I have",
+        prompt: "What can I plan this week that uses up ingredients I already have?",
+        kind: "planning",
+        scopeKinds: ["meal_plan", "pantry"],
+      },
+    ],
+  });
 
   useEffect(() => {
     ctrl.loadPlanForWeek(currentStartDate);

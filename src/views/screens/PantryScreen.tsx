@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing, typography } from "@/constants";
 import { usePantryController } from "@/controllers/usePantryController";
+import { useRegisterAssistantContext } from "@/controllers";
 import type { PantrySuggestion } from "@/prompts/pantrySuggestions";
 import { createLogger } from "@/utils/logger";
 import { EMPTY_PANTRY_ITEM_DRAFT } from "@/utils/pantry";
@@ -55,6 +56,33 @@ export default function PantryScreen() {
   const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
   const [recipeLoading, setRecipeLoading] = useState(false);
   const [suggestingShelfLife, setSuggestingShelfLife] = useState(false);
+
+  useRegisterAssistantContext({
+    scope: { kind: "pantry" },
+    promptSuggestions: [
+      {
+        id: "pantry-cook",
+        label: "What can I cook?",
+        prompt: "What can I make with what I have, especially anything expiring soon?",
+        kind: "planning",
+        scopeKinds: ["pantry"],
+      },
+      {
+        id: "pantry-plan",
+        label: "Plan around my pantry",
+        prompt: "Help me plan this week's dinners around what I already have.",
+        kind: "planning",
+        scopeKinds: ["pantry", "meal_plan"],
+      },
+      {
+        id: "pantry-shelf",
+        label: "How long does it keep?",
+        prompt: "How long does a typical pantry item last once opened?",
+        kind: "general",
+        scopeKinds: ["pantry"],
+      },
+    ],
+  });
 
   useEffect(() => {
     if (!removalPrompt) return;

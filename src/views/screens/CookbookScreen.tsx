@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing, typography } from "@/constants";
-import { useCookbookController, useRecipeController } from "@/controllers";
+import { useCookbookController, useRecipeController, useRegisterAssistantContext } from "@/controllers";
 import type { RecipeCookStats } from "@/models/repositories";
 import type { Cookbook, Recipe } from "@/models/types";
 import { CookbookShelf } from "@/views/components/cookbook/CookbookShelf.view";
@@ -134,6 +134,39 @@ export default function CookbookScreen() {
   }, [cookbooks, parentCookbookId]);
   const isNestedCookbook = currentCookbookId !== null;
   const activeCookbookId = currentCookbook?.id ?? null;
+
+  useRegisterAssistantContext({
+    scope: {
+      kind: "cookbook",
+      cookbookId: activeCookbookId ?? undefined,
+      label: currentCookbook?.title ?? "Cookbooks",
+    },
+    promptSuggestions: [
+      {
+        id: "cookbook-suggest",
+        label: "Find a recipe",
+        prompt: currentCookbook
+          ? `Suggest a recipe that fits the theme of my "${currentCookbook.title}" cookbook.`
+          : "Suggest a recipe I could add to my collection.",
+        kind: "general",
+        scopeKinds: ["cookbook"],
+      },
+      {
+        id: "cookbook-pair",
+        label: "What pairs well?",
+        prompt: "What dishes or drinks would pair well with the style of this cookbook?",
+        kind: "general",
+        scopeKinds: ["cookbook"],
+      },
+      {
+        id: "cookbook-adapt",
+        label: "Adapt a dish",
+        prompt: "Can you help me adapt one of my recipes to a different dietary need or skill level?",
+        kind: "adaptation",
+        scopeKinds: ["cookbook", "recipe"],
+      },
+    ],
+  });
 
   useEffect(() => {
     setIsEditingCookbook(false);
