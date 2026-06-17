@@ -381,8 +381,8 @@ export default function CookbookScreen() {
 
         {currentCookbook && isEditingCookbook ? (
           <View style={styles.manageCard}>
-            <View style={styles.manageCardHeader}>
-              <Text style={styles.manageCardTitle}>Edit cookbook</Text>
+            <View style={styles.cardHeader}>
+              <Text style={textStyles.sectionTitle}>Edit cookbook</Text>
             </View>
 
             <TextField
@@ -403,7 +403,7 @@ export default function CookbookScreen() {
               autoCorrect
             />
 
-            <View style={styles.manageCardActions}>
+            <View style={styles.cardActions}>
               <Button
                 label="Save"
                 size="sm"
@@ -424,16 +424,16 @@ export default function CookbookScreen() {
 
         {currentCookbook && isConfirmingDelete ? (
           <View style={styles.manageCard}>
-            <View style={styles.manageCardHeader}>
-              <Text style={styles.manageCardTitle}>Delete cookbook</Text>
-              <Text style={styles.manageCardCopy}>
+            <View style={styles.cardHeader}>
+              <Text style={textStyles.sectionTitle}>Delete cookbook</Text>
+              <Text style={styles.cardCopy}>
                 {parentCookbook
                   ? `Any recipes in the cookbook will get transferred to the ${parentCookbook.title} cookbook.`
                   : "Any recipes will be saved in the Recipes home screen."}
               </Text>
             </View>
 
-            <View style={styles.manageCardActions}>
+            <View style={styles.cardActions}>
               <Button
                 label="Delete cookbook"
                 size="sm"
@@ -486,9 +486,9 @@ export default function CookbookScreen() {
       <View style={styles.section}>
         {isAddingCookbook ? (
           <View style={styles.addBookCard}>
-            <View style={styles.addBookHeader}>
-              <Text style={styles.addBookTitle}>Add cookbook</Text>
-              <Text style={styles.addBookCopy}>
+            <View style={styles.cardHeader}>
+              <Text style={textStyles.sectionTitle}>Add cookbook</Text>
+              <Text style={styles.cardCopy}>
                 Start a new book on your shelf and gather related recipes in one
                 place.
               </Text>
@@ -512,7 +512,7 @@ export default function CookbookScreen() {
               autoCorrect
             />
 
-            <View style={styles.addBookActions}>
+            <View style={styles.cardActions}>
               <Button
                 label="Add"
                 onPress={() => {
@@ -589,25 +589,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
   },
 
-  addBookHeader: {
+  cardHeader: {
     gap: spacing.xs,
     marginBottom: spacing.lg,
   },
 
-  addBookTitle: {
-    fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-
-  addBookCopy: {
+  cardCopy: {
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
     color: colors.text.secondary,
   },
 
-  addBookActions: {
+  cardActions: {
     marginTop: spacing.lg,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -658,28 +651,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
   },
 
-  manageCardHeader: {
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-
-  manageCardTitle: {
-    fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-
-  manageCardCopy: {
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    color: colors.text.secondary,
-  },
-
-  manageCardActions: {
-    marginTop: spacing.lg,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-  },
 });
