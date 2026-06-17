@@ -335,24 +335,26 @@ export const usePantryController = () => {
         upsertItem(updated);
         HabitService.record("pantry_item_used");
 
-        // Ask LLM whether usage count warrants a removal prompt. Non-fatal.
+        // Fire LLM check detached — doesn't block the editor from closing.
         if (profile) {
-          try {
-            const response = await LLMService.send({
-              system: "You are a practical kitchen assistant. Answer only yes or no.",
-              messages: [
-                {
-                  role: "user",
-                  content: `Pantry item: "${updated.name}", used ${updated.usedCount} time${updated.usedCount === 1 ? "" : "s"}. Based on the name and usage count, should the user be asked if they want to remove it? Single-use items (one lime, one egg) → yes after 1 use. Bulk dry goods (flour, chickpeas, rice) → only after many uses. Homemade preserves → no. Reply with only: yes or no.`,
-                },
-              ],
-            });
-            if (/^yes/i.test(response.content.trim())) {
-              setRemovalPrompt({ id: updated.id, name: updated.name });
+          void (async () => {
+            try {
+              const response = await LLMService.send({
+                system: "You are a practical kitchen assistant. Answer only yes or no.",
+                messages: [
+                  {
+                    role: "user",
+                    content: `Pantry item: "${updated.name}", used ${updated.usedCount} time${updated.usedCount === 1 ? "" : "s"}. Based on the name and usage count, should the user be asked if they want to remove it? Single-use items (one lime, one egg) → yes after 1 use. Bulk dry goods (flour, chickpeas, rice) → only after many uses. Homemade preserves → no. Reply with only: yes or no.`,
+                  },
+                ],
+              });
+              if (/^yes/i.test(response.content.trim())) {
+                setRemovalPrompt({ id: updated.id, name: updated.name });
+              }
+            } catch {
+              // LLM failure is non-fatal
             }
-          } catch {
-            // LLM failure is non-fatal — skip the prompt silently
-          }
+          })();
         }
 
         return true;

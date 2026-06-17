@@ -133,7 +133,7 @@ export interface AdaptationStructuredMessage {
   payload: AdaptationResponse;
 }
 
-export type AssistantStructuredMessage = AdaptationStructuredMessage;
+export type AssistantStructuredMessage = AdaptationStructuredMessage | PantryAddSuggestionStructuredMessage;
 
 export interface Message {
   id: string;
@@ -178,4 +178,26 @@ export interface AssistantCreateRecipeAction {
   idea: string;
 }
 
-export type AssistantAction = AssistantCreateRecipeAction;
+export interface AssistantAddPantryItemAction {
+  action: "add_pantry_item";
+  name: string;
+  zone: "fridge" | "freezer" | "cupboard";
+  unit?: string;
+  quantity?: string;
+  createdDate?: string | null;
+  expiryDate?: string | null;
+}
+
+export type AssistantAction = AssistantCreateRecipeAction | AssistantAddPantryItemAction;
+
+export interface PantryAddSuggestionPayload {
+  name: string;
+  zone: "fridge" | "freezer" | "cupboard";
+  createdDate?: string | null;
+  expiryDate?: string | null;
+}
+
+export interface PantryAddSuggestionStructuredMessage {
+  type: "pantry_add_suggestion";
+  payload: PantryAddSuggestionPayload;
+}

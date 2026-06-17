@@ -3,12 +3,13 @@ import { StyleSheet, View } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { AssistantAction } from "@/models/types";
+import type { AssistantAction, PantryAddSuggestionPayload } from "@/models/types";
 import {
   useAssistantShellController,
   useConversationController,
   useRecipeController,
 } from "@/controllers";
+import { usePantryController } from "@/controllers/usePantryController";
 import {
   useAssistantExternalPromptStore,
   useAssistantRouteContextStore,
@@ -45,6 +46,7 @@ export function AssistantShell() {
   const insets = useSafeAreaInsets();
   const { mode, open, close } = useAssistantShellController();
   const { importRecipeSource } = useRecipeController();
+  const { addItem: addPantryItem } = usePantryController();
   const setDraft = useRecipeDraftStore((s) => s.setDraft);
   const routeContext = useAssistantRouteContextStore((s) => s.routeContext);
   const pendingPrompt = useAssistantExternalPromptStore((s) => s.pendingPrompt);
@@ -84,6 +86,28 @@ export function AssistantShell() {
         setIsGeneratingRecipe(false);
       }
     }
+
+    if (action.action === "add_pantry_item") {
+      void addPantryItem({
+        name: action.name,
+        quantity: action.quantity ?? "1",
+        unit: action.unit ?? "unit",
+        storageZone: action.zone,
+        expiryDate: action.expiryDate ?? "",
+        createdDate: action.createdDate ?? "",
+      });
+    }
+  };
+
+  const handleConfirmPantryAdd = (payload: PantryAddSuggestionPayload) => {
+    void addPantryItem({
+      name: payload.name,
+      quantity: "1",
+      unit: "unit",
+      storageZone: payload.zone,
+      expiryDate: payload.expiryDate ?? "",
+      createdDate: payload.createdDate ?? "",
+    });
   };
 
   const conversation = useConversationController({
@@ -131,6 +155,7 @@ export function AssistantShell() {
       <AssistantChatOverlay
         conversation={conversation}
         onClose={close}
+        onConfirmPantryAdd={handleConfirmPantryAdd}
       />
     );
   }
