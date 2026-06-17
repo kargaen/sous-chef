@@ -36,6 +36,11 @@ type ValidZone = (typeof VALID_ZONES)[number];
 const isValidZone = (v: unknown): v is ValidZone =>
   VALID_ZONES.includes(v as ValidZone);
 
+const VALID_MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
+type ValidMealType = (typeof VALID_MEAL_TYPES)[number];
+const isValidMealType = (v: unknown): v is ValidMealType =>
+  VALID_MEAL_TYPES.includes(v as ValidMealType);
+
 const parseAction = (content: string): AssistantAction | null => {
   const trimmed = stripJsonFences(content).trim();
   if (!trimmed.startsWith("{")) return null;
@@ -57,6 +62,17 @@ const parseAction = (content: string): AssistantAction | null => {
         quantity: typeof parsed.quantity === "string" ? parsed.quantity : undefined,
         createdDate: typeof parsed.createdDate === "string" ? parsed.createdDate : null,
         expiryDate: typeof parsed.expiryDate === "string" ? parsed.expiryDate : null,
+      };
+    }
+    if (
+      parsed.action === "add_to_meal_plan" &&
+      typeof parsed.recipeTitle === "string" &&
+      isValidMealType(parsed.mealType)
+    ) {
+      return {
+        action: "add_to_meal_plan",
+        recipeTitle: parsed.recipeTitle,
+        mealType: parsed.mealType,
       };
     }
     return null;

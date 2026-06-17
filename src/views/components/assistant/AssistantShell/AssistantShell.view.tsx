@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { AssistantAction, PantryAddSuggestionPayload } from "@/models/types";
+import type { AssistantAction, PantryAddSuggestionPayload, SuggestionSlot } from "@/models/types";
 import {
   useAssistantShellController,
   useConversationController,
@@ -14,8 +14,10 @@ import {
   useAssistantExternalPromptStore,
   useAssistantRouteContextStore,
   useConversationStore,
+  useMealPlanStore,
   useRecipeDraftStore,
 } from "@/store";
+import { todayKey } from "@/utils/planDateUtils";
 import { colors } from "@/constants";
 import { AssistantChatOverlay } from "../AssistantChatOverlay";
 import { AssistantLauncher } from "../AssistantLauncher";
@@ -48,6 +50,7 @@ export function AssistantShell() {
   const { importRecipeSource } = useRecipeController();
   const { addItem: addPantryItem } = usePantryController();
   const setDraft = useRecipeDraftStore((s) => s.setDraft);
+  const setMealPlanDraftSlots = useMealPlanStore((s) => s.setDraftSlots);
   const routeContext = useAssistantRouteContextStore((s) => s.routeContext);
   const pendingPrompt = useAssistantExternalPromptStore((s) => s.pendingPrompt);
   const clearPendingPrompt = useAssistantExternalPromptStore(
@@ -100,6 +103,20 @@ export function AssistantShell() {
         setSpeechBubbleTone("happy");
         setSpeechBubble(`Added ${action.name} to your pantry.`);
       }
+    }
+
+    if (action.action === "add_to_meal_plan") {
+      const slot: SuggestionSlot = {
+        id: `suggestion-${Date.now()}`,
+        date: todayKey(),
+        type: action.mealType,
+        suggestionText: action.recipeTitle,
+      };
+      const currentDrafts = useMealPlanStore.getState().draftSlots;
+      setMealPlanDraftSlots([...currentDrafts, slot]);
+      router.push("/(tabs)/plan");
+      setSpeechBubbleTone("happy");
+      setSpeechBubble(`Added ${action.recipeTitle} as a ${action.mealType} suggestion — tap Accept in your plan.`);
     }
   };
 

@@ -74,5 +74,12 @@ Do NOT use this for explicit "add to pantry" requests (use add_pantry_item inste
 Format: answer in plain text, then on the very last line (no trailing text after it):
 {"suggest_pantry_add":true,"name":"<item name>","zone":"fridge"|"freezer"|"cupboard","createdDate":"<YYYY-MM-DD if mentioned, otherwise omit>","expiryDate":"<YYYY-MM-DD based on your shelf-life answer>"}
 
+### add_to_meal_plan
+Trigger when the cook explicitly asks to schedule, add, or put a recipe into their meal plan, week plan, or tonight's dinner.
+Examples: "add pasta to my plan", "put chicken tikka in for tonight", "schedule this for lunch", "I want to make risotto this week"
+
+Response format (the ONLY thing you return):
+{"action":"add_to_meal_plan","recipeTitle":"<recipe name exactly as the cook described it>","mealType":"breakfast"|"lunch"|"dinner"|"snack"}
+
 For everything else — questions, tips, general conversation — respond normally in plain text.
 `.trim();

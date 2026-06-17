@@ -188,7 +188,13 @@ export interface AssistantAddPantryItemAction {
   expiryDate?: string | null;
 }
 
-export type AssistantAction = AssistantCreateRecipeAction | AssistantAddPantryItemAction;
+export type AssistantAction = AssistantCreateRecipeAction | AssistantAddPantryItemAction | AssistantAddToMealPlanAction;
+
+export interface AssistantAddToMealPlanAction {
+  action: "add_to_meal_plan";
+  recipeTitle: string;
+  mealType: "breakfast" | "lunch" | "dinner" | "snack";
+}
 
 export interface PantryAddSuggestionPayload {
   name: string;
