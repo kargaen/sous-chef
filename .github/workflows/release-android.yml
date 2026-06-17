@@ -2,9 +2,9 @@ name: Build & Release Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
-# Cancel any in-flight build when a newer commit arrives on main.
+# Cancel any in-flight build when a newer commit arrives on master.
 # Note: the EAS cloud build itself is not cancelled — only the GH Actions
 # runner is. EAS credits are consumed either way; keep pushes intentional.
 concurrency:
