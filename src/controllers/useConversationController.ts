@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { AdaptationResponseSchema } from "@/models/schemas";
 import { RecipeRepository } from "@/models/repositories/RecipeRepository";
-import type { AssistantAction, Message, SuggestionContext } from "@/models/types";
+import type { AssistantAction, Message, PantryAddSuggestionPayload, SuggestionContext } from "@/models/types";
 import {
   buildAdaptationPrompt,
   buildConversationPrompt,
@@ -31,6 +31,16 @@ const stripJsonFences = (value: string): string =>
     .replace(/\s*```$/i, "")
     .trim();
 
+const VALID_ZONES = ["fridge", "freezer", "cupboard"] as const;
+type ValidZone = (typeof VALID_ZONES)[number];
+const isValidZone = (v: unknown): v is ValidZone =>
+  VALID_ZONES.includes(v as ValidZone);
+
+const VALID_MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
+type ValidMealType = (typeof VALID_MEAL_TYPES)[number];
+const isValidMealType = (v: unknown): v is ValidMealType =>
+  VALID_MEAL_TYPES.includes(v as ValidMealType);
+
 const parseAction = (content: string): AssistantAction | null => {
   const trimmed = stripJsonFences(content).trim();
   if (!trimmed.startsWith("{")) return null;
@@ -39,7 +49,62 @@ const parseAction = (content: string): AssistantAction | null => {
     if (parsed.action === "create_recipe" && typeof parsed.idea === "string") {
       return { action: "create_recipe", idea: parsed.idea };
     }
+    if (
+      parsed.action === "add_pantry_item" &&
+      typeof parsed.name === "string" &&
+      isValidZone(parsed.zone)
+    ) {
+      return {
+        action: "add_pantry_item",
+        name: parsed.name,
+        zone: parsed.zone,
+        unit: typeof parsed.unit === "string" ? parsed.unit : undefined,
+        quantity: typeof parsed.quantity === "string" ? parsed.quantity : undefined,
+        createdDate: typeof parsed.createdDate === "string" ? parsed.createdDate : null,
+        expiryDate: typeof parsed.expiryDate === "string" ? parsed.expiryDate : null,
+      };
+    }
+    if (
+      parsed.action === "add_to_meal_plan" &&
+      typeof parsed.recipeTitle === "string" &&
+      isValidMealType(parsed.mealType)
+    ) {
+      return {
+        action: "add_to_meal_plan",
+        recipeTitle: parsed.recipeTitle,
+        mealType: parsed.mealType,
+      };
+    }
     return null;
+  } catch {
+    return null;
+  }
+};
+
+const parsePantryAddSuggestion = (
+  content: string,
+): { text: string; payload: PantryAddSuggestionPayload } | null => {
+  const lines = content.split("\n");
+  const lastLine = lines[lines.length - 1].trim();
+  if (!lastLine.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(lastLine) as Record<string, unknown>;
+    if (
+      parsed.suggest_pantry_add !== true ||
+      typeof parsed.name !== "string" ||
+      !isValidZone(parsed.zone)
+    ) {
+      return null;
+    }
+    return {
+      text: lines.slice(0, -1).join("\n").trim(),
+      payload: {
+        name: parsed.name,
+        zone: parsed.zone,
+        createdDate: typeof parsed.createdDate === "string" ? parsed.createdDate : null,
+        expiryDate: typeof parsed.expiryDate === "string" ? parsed.expiryDate : null,
+      },
+    };
   } catch {
     return null;
   }
@@ -236,6 +301,23 @@ export function useConversationController(
         const action = parseAction(response.content);
         if (action && onDispatchAction) {
           onDispatchAction(action);
+          return { tone: "happy" };
+        }
+
+        const pantrySuggestion = parsePantryAddSuggestion(response.content);
+        if (pantrySuggestion) {
+          addMessage({
+            id: `msg_${Date.now() + 1}`,
+            role: "assistant",
+            content: pantrySuggestion.text,
+            createdAt: new Date().toISOString(),
+            scope: resolvedScope,
+            structuredMessage: {
+              type: "pantry_add_suggestion",
+              payload: pantrySuggestion.payload,
+            },
+          });
+          HabitService.record("chat_opened");
           return { tone: "happy" };
         }
       }

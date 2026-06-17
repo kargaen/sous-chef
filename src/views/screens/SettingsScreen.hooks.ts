@@ -6,6 +6,7 @@ import { useChefController, useSettingsController } from "@/controllers";
 import type {
   AppSettings,
   ChefProfile,
+  PantryNudgeFrequency,
   SkillLevel,
   SustainabilityNudgeLevel,
 } from "@/models/types";
@@ -56,6 +57,17 @@ const DIET_OPTIONS = [
   { value: "flexitarian", label: "Flexitarian" },
   { value: "gluten-free", label: "Gluten-free" },
 ] as const;
+
+const NUDGE_FREQUENCY_OPTIONS: {
+  value: PantryNudgeFrequency;
+  label: string;
+  description: string;
+}[] = [
+  { value: "daily", label: "Daily", description: "Suggest from your pantry every day." },
+  { value: "weekly", label: "Weekly", description: "A fresh batch of ideas each week." },
+  { value: "monthly", label: "Monthly", description: "Check in once a month on forgotten staples." },
+  { value: "rarely", label: "Rarely", description: "Only surface suggestions every 3 months." },
+];
 
 const SKILL_OPTIONS: { value: SkillLevel; label: string }[] = [
   { value: "beginner", label: "Beginner" },
@@ -315,6 +327,11 @@ export const useSettingsScreenView = () => {
       hasLoaded: hasLoaded && hasLoadedProfile,
       highlightedSectionId,
       loading: loading || profileLoading,
+      nudgeFrequencyOptions: NUDGE_FREQUENCY_OPTIONS,
+      nudgeFrequencyHelperText:
+        NUDGE_FREQUENCY_OPTIONS.find(
+          (option) => option.value === (draft.pantryNudgeFrequency ?? "monthly"),
+        )?.description ?? "",
       profileDraft,
       scrollViewRef,
       sectionIds: SETTINGS_SECTION_IDS,

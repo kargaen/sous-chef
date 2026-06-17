@@ -9,6 +9,9 @@ export interface PantryItem {
   unit: string;
   storageZone: StorageZone;
   expiryDate?: string;
+  createdDate?: string;      // YYYY-MM-DD — when a homemade item was made
+  usedCount: number;         // incremented each time the item is marked used
+  lastSurfacedAt?: string;   // ISO timestamp — last time this item appeared in a suggestion
 }
 
 export interface WasteEntry {

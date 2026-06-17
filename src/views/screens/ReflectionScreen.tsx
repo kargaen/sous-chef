@@ -1,9 +1,10 @@
 import { useLocalSearchParams } from "expo-router";
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing } from "@/constants";
 import { useReflectionController } from "@/controllers";
+import { usePantryController } from "@/controllers/usePantryController";
 import { Button, HatRating, Spinner } from "@/views/components/ui";
 import { RecipePhotoEditor } from "@/views/components/recipe/RecipePhotoEditor";
 import { SousChefMark } from "@/views/components/companion";
@@ -17,10 +18,38 @@ export default function ReflectionScreen() {
   const insets = useSafeAreaInsets();
   const recipeId = typeof params.id === "string" ? params.id : "";
   const view = useReflectionController(recipeId);
+  const pantry = usePantryController();
 
   const handleSave = async () => {
     const ok = await view.onSave();
-    if (ok) goBack();
+    if (!ok) return;
+    const title = view.recipeTitle;
+    if (title) {
+      Alert.alert(
+        "Save leftovers?",
+        `Want to add leftover ${title} to your pantry? Sous Chef will suggest how long it keeps.`,
+        [
+          {
+            text: "No thanks",
+            style: "cancel",
+            onPress: goBack,
+          },
+          {
+            text: "Save to pantry",
+            onPress: () => {
+              void pantry.saveLeftoversFromCook(title).then((ok) => {
+                if (!ok) {
+                  Alert.alert("Couldn't save", "The pantry item could not be saved. You can add it manually from the Pantry tab.");
+                }
+                goBack();
+              });
+            },
+          },
+        ],
+      );
+    } else {
+      goBack();
+    }
   };
 
   const handleSkip = async () => {

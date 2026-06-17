@@ -3,10 +3,23 @@ import { ZodError } from "zod";
 
 import { PantryRepository } from "../models/repositories/PantryRepository";
 import { PantryItemSchema } from "../models/schemas/PantrySchema";
-import { STORAGE_ZONES, type PantryItem, type StorageZone } from "../models/types";
+import { STORAGE_ZONES, type PantryItem, type PantryNudgeFrequency, type Recipe, type StorageZone } from "../models/types";
 import { HabitService } from "../services/HabitService";
+import { LLMService } from "../services/LLMService";
+import { RecipeImportService } from "../services/RecipeImportService";
 import { WasteService } from "../services/WasteService";
+import { useChefProfileStore } from "../store/chefProfileStore";
 import { usePantryStore } from "../store/pantryStore";
+import { useSettingsStore } from "../store/settingsStore";
+import { buildSystemPrompt } from "../prompts";
+import {
+  PANTRY_SUGGESTION_SYSTEM_PROMPT,
+  buildPantrySuggestionsPrompt,
+  buildPantrySwapPrompt,
+  parsePantrySuggestions,
+  type PantrySuggestion,
+} from "../prompts/pantrySuggestions";
+import { RecipeRepository } from "../models/repositories/RecipeRepository";
 import {
   formatPantryQuantity,
   getDaysUntilExpiry,
@@ -21,7 +34,15 @@ import { createLogger } from "@/utils/logger";
 
 const log = createLogger("usePantryController");
 
+const NUDGE_WINDOW_MS: Record<PantryNudgeFrequency, number> = {
+  daily: 1 * 86_400_000,
+  weekly: 7 * 86_400_000,
+  monthly: 30 * 86_400_000,
+  rarely: 90 * 86_400_000,
+};
+
 const repo = new PantryRepository();
+const recipeRepo = new RecipeRepository();
 
 export interface PantryItemViewModel {
   id: string;
@@ -30,6 +51,8 @@ export interface PantryItemViewModel {
   zone: StorageZone;
   expiryStatus: PantryExpiryStatus;
   expiryLabel: string;
+  createdLabel?: string;
+  usedCount: number;
   draft: PantryItemDraft;
 }
 
@@ -66,19 +89,25 @@ const normaliseQuantity = (value: string): number => {
   return parsed;
 };
 
-const normaliseExpiryDate = (value: string): string | undefined => {
+const normaliseExpiryDate = (value: string): string | undefined =>
+  normaliseDateField(value, "Expiry date");
+
+const normaliseCreatedDate = (value: string): string | undefined =>
+  normaliseDateField(value, "Made on date");
+
+const normaliseDateField = (value: string, label: string): string | undefined => {
   const trimmed = value.trim();
 
   if (!trimmed) return undefined;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    throw new Error("Expiry date must use YYYY-MM-DD.");
+    throw new Error(`${label} must use YYYY-MM-DD.`);
   }
 
   const parsed = new Date(`${trimmed}T00:00:00`);
 
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error("Expiry date is not valid.");
+    throw new Error(`${label} is not valid.`);
   }
 
   return trimmed;
@@ -102,6 +131,7 @@ const buildPantryItem = (draft: PantryItemDraft, id: string): PantryItem => {
     unit: draft.unit.trim() || "unit",
     storageZone: draft.storageZone,
     expiryDate: normaliseExpiryDate(draft.expiryDate),
+    createdDate: normaliseCreatedDate(draft.createdDate),
   });
 };
 
@@ -122,6 +152,15 @@ const sortPantryItems = (items: PantryItem[]): PantryItem[] => {
   });
 };
 
+const getCreatedLabel = (createdDate?: string): string | undefined => {
+  if (!createdDate) return undefined;
+  const created = new Date(`${createdDate}T00:00:00`);
+  const days = Math.floor((Date.now() - created.getTime()) / 86_400_000);
+  if (days <= 0) return "made today";
+  if (days === 1) return "made yesterday";
+  return `made ${days} days ago`;
+};
+
 const toPantryItemViewModel = (item: PantryItem): PantryItemViewModel => {
   return {
     id: item.id,
@@ -130,6 +169,8 @@ const toPantryItemViewModel = (item: PantryItem): PantryItemViewModel => {
     zone: item.storageZone,
     expiryStatus: getPantryExpiryStatus(item.expiryDate),
     expiryLabel: getPantryExpiryLabel(item.expiryDate),
+    createdLabel: getCreatedLabel(item.createdDate),
+    usedCount: item.usedCount ?? 0,
     draft: toPantryItemDraft(item),
   };
 };
@@ -156,7 +197,10 @@ export const usePantryController = () => {
   const [error, setError] = useState<string | null>(null);
   const [expiringSoon, setExpiringSoon] = useState<PantryItem[]>([]);
   const [expiredItems, setExpiredItems] = useState<PantryItem[]>([]);
+  const [removalPrompt, setRemovalPrompt] = useState<{ id: string; name: string } | null>(null);
 
+  const profile = useChefProfileStore((s) => s.profile);
+  const appSettings = useSettingsStore((s) => s.settings);
   const items = usePantryStore((state) => state.items);
   const setItems = usePantryStore((state) => state.setItems);
   const upsertItem = usePantryStore((state) => state.upsertItem);
@@ -230,7 +274,16 @@ export const usePantryController = () => {
           throw new Error("That pantry item could not be found.");
         }
 
-        const nextItem = buildPantryItem(draft, id);
+        const nextItem: PantryItem = {
+          ...buildPantryItem(draft, id),
+          usedCount: existingItem.usedCount ?? 0,
+          // Prefer the user's edited createdDate; fall back to the stored value
+          // so existing items without a draft createdDate don't lose their date.
+          createdDate: draft.createdDate.trim()
+            ? normaliseCreatedDate(draft.createdDate)
+            : existingItem.createdDate,
+          lastSurfacedAt: existingItem.lastSurfacedAt,
+        };
         await repo.update(nextItem);
         upsertItem(nextItem);
         await refreshExpiryBuckets();
@@ -270,9 +323,74 @@ export const usePantryController = () => {
 
   const markItemUsed = useCallback(
     async (id: string): Promise<boolean> => {
-      return removeItemById(id);
+      setError(null);
+      try {
+        const item = await repo.getById(id);
+        if (!item) return false;
+        const updated: PantryItem = { ...item, usedCount: (item.usedCount ?? 0) + 1 };
+        await repo.update(updated);
+        upsertItem(updated);
+        HabitService.record("pantry_item_used");
+
+        // Fire LLM check detached — doesn't block the editor from closing.
+        if (profile) {
+          void (async () => {
+            try {
+              const response = await LLMService.send({
+                system: "You are a practical kitchen assistant. Answer only yes or no.",
+                messages: [
+                  {
+                    role: "user",
+                    content: `Pantry item: "${updated.name}", used ${updated.usedCount} time${updated.usedCount === 1 ? "" : "s"}. Based on the name and usage count, should the user be asked if they want to remove it? Single-use items (one lime, one egg) → yes after 1 use. Bulk dry goods (flour, chickpeas, rice) → only after many uses. Homemade preserves → no. Reply with only: yes or no.`,
+                  },
+                ],
+              });
+              if (/^yes/i.test(response.content.trim())) {
+                setRemovalPrompt({ id: updated.id, name: updated.name });
+              }
+            } catch {
+              // LLM failure is non-fatal
+            }
+          })();
+        }
+
+        return true;
+      } catch (err) {
+        log.error("Could not mark pantry item as used", err);
+        setError("Could not update item.");
+        return false;
+      }
     },
-    [removeItemById],
+    [upsertItem, profile],
+  );
+
+  const clearRemovalPrompt = useCallback(() => setRemovalPrompt(null), []);
+
+  // Asks the LLM how long a homemade item typically keeps in the fridge.
+  // Returns a suggested YYYY-MM-DD expiry date, or null on failure.
+  const suggestShelfLife = useCallback(
+    async (itemName: string): Promise<string | null> => {
+      if (!profile) return null;
+      try {
+        const response = await LLMService.send({
+          system: buildSystemPrompt(profile),
+          messages: [
+            {
+              role: "user",
+              content: `How many days does homemade ${itemName.trim()} typically last when refrigerated? Reply with only a positive integer — no other text.`,
+            },
+          ],
+        });
+        const days = parseInt(response.content.trim(), 10);
+        if (!Number.isFinite(days) || days <= 0) return null;
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + days);
+        return expiry.toISOString().slice(0, 10);
+      } catch {
+        return null;
+      }
+    },
+    [profile],
   );
 
   const logWasteForItem = useCallback(
@@ -305,6 +423,197 @@ export const usePantryController = () => {
     [refreshExpiryBuckets, removeItem],
   );
 
+  // Returns items prioritised for the pantry suggestion flow (P5).
+  // Fridge/freezer items expiring soon come first; cupboard items follow
+  // when they have not been surfaced within the user's nudge window.
+  const getPrioritisedSuggestionItems = useCallback((): PantryItem[] => {
+    const frequency = appSettings?.pantryNudgeFrequency ?? "monthly";
+    const windowMs = NUDGE_WINDOW_MS[frequency];
+    const now = Date.now();
+
+    const expiring = items
+      .filter((item) => {
+        if (item.storageZone === "cupboard") return false;
+        const status = getPantryExpiryStatus(item.expiryDate);
+        return status === "soon" || status === "expired";
+      })
+      .sort((a, b) => {
+        const ad = getDaysUntilExpiry(a.expiryDate) ?? 999;
+        const bd = getDaysUntilExpiry(b.expiryDate) ?? 999;
+        return ad - bd;
+      });
+
+    const cupboard = items
+      .filter((item) => {
+        if (item.storageZone !== "cupboard") return false;
+        if (!item.lastSurfacedAt) return true;
+        return now - new Date(item.lastSurfacedAt).getTime() >= windowMs;
+      })
+      .sort((a, b) => {
+        const at = a.lastSurfacedAt ? new Date(a.lastSurfacedAt).getTime() : 0;
+        const bt = b.lastSurfacedAt ? new Date(b.lastSurfacedAt).getTime() : 0;
+        return at - bt;
+      });
+
+    return [...expiring, ...cupboard];
+  }, [items, appSettings]);
+
+  // Stamps lastSurfacedAt = now on a batch of items after a suggestion run.
+  const markItemsSurfaced = useCallback(
+    async (ids: string[]): Promise<void> => {
+      const now = new Date().toISOString();
+      for (const id of ids) {
+        const item = items.find((i) => i.id === id);
+        if (!item) continue;
+        const updated: PantryItem = { ...item, lastSurfacedAt: now };
+        await repo.update(updated);
+        upsertItem(updated);
+      }
+    },
+    [items, upsertItem],
+  );
+
+  // P5.2 — Returns 3-4 recipe suggestions derived from the prioritised
+  // pantry items. Stamps lastSurfacedAt on all surfaced items.
+  const suggestFromPantry = useCallback(async (): Promise<PantrySuggestion[]> => {
+    if (!profile) return [];
+    const candidates = getPrioritisedSuggestionItems();
+    if (candidates.length === 0) return [];
+
+    const contextItems = candidates.slice(0, 12).map((item) => ({
+      name: item.name,
+      zone: item.storageZone,
+      daysUntilExpiry: getDaysUntilExpiry(item.expiryDate),
+    }));
+
+    try {
+      const response = await LLMService.send({
+        system: PANTRY_SUGGESTION_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: buildPantrySuggestionsPrompt({
+              items: contextItems,
+              cuisinePreferences: profile.cuisinePreferences ?? [],
+              skillLevel: profile.skillLevel ?? null,
+              month: new Date().getMonth() + 1,
+            }),
+          },
+        ],
+      });
+
+      const suggestions = parsePantrySuggestions(response.content);
+      if (suggestions.length > 0) {
+        await markItemsSurfaced(candidates.slice(0, 12).map((i) => i.id));
+      }
+      return suggestions;
+    } catch {
+      return [];
+    }
+  }, [profile, getPrioritisedSuggestionItems, markItemsSurfaced]);
+
+  // P5.3 — Swaps one suggestion in the list; returns the replacement or null.
+  const swapSuggestion = useCallback(
+    async (
+      target: PantrySuggestion,
+      current: PantrySuggestion[],
+    ): Promise<PantrySuggestion | null> => {
+      if (!profile) return null;
+      try {
+        const response = await LLMService.send({
+          system: PANTRY_SUGGESTION_SYSTEM_PROMPT,
+          messages: [
+            {
+              role: "user",
+              content: buildPantrySwapPrompt(
+                target.primaryItemName || target.title,
+                current.map((s) => s.title),
+                {
+                  cuisinePreferences: profile.cuisinePreferences ?? [],
+                  skillLevel: profile.skillLevel ?? null,
+                  month: new Date().getMonth() + 1,
+                },
+              ),
+            },
+          ],
+        });
+        const results = parsePantrySuggestions(response.content);
+        return results[0] ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [profile],
+  );
+
+  // P5.5 — Generates a full recipe from a pantry suggestion and saves it.
+  // Delegates generation to RecipeImportService; caller saves via recipeRepo.
+  const generateRecipeFromIdea = useCallback(
+    async (suggestion: PantrySuggestion): Promise<Recipe | null> => {
+      if (!profile) return null;
+      const source = suggestion.description
+        ? `${suggestion.title} — ${suggestion.description}`
+        : suggestion.title;
+      const recipe = await RecipeImportService.generateRecipeFromIdea(source, profile);
+      if (recipe) await recipeRepo.save(recipe);
+      return recipe;
+    },
+    [profile],
+  );
+
+  // P5.4 — Fuzzy-matches a suggestion title against saved recipes.
+  // Returns the first match above a basic similarity threshold, or null.
+  const findRecipeForSuggestion = useCallback(
+    async (suggestion: PantrySuggestion): Promise<string | null> => {
+      const results = await recipeRepo.search(suggestion.title);
+      if (results.length === 0) return null;
+      const q = suggestion.title.toLowerCase();
+      const match = results.find((r) => {
+        const t = r.title.toLowerCase();
+        return t.includes(q) || q.includes(t) || t.split(" ").some((w) => q.includes(w) && w.length > 4);
+      });
+      return match?.id ?? null;
+    },
+    [],
+  );
+
+  // P7 — Saves a cooked dish as pantry leftovers. Uses suggestShelfLife to
+  // derive an expiry date so the cook doesn't have to guess.
+  const saveLeftoversFromCook = useCallback(
+    async (recipeName: string): Promise<boolean> => {
+      const trimmedName = recipeName.trim();
+      if (!trimmedName) return false;
+      setLoading(true);
+      setError(null);
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const expiryDate = await suggestShelfLife(trimmedName);
+        const item: PantryItem = PantryItemSchema.parse({
+          id: `pantry_${Date.now()}`,
+          name: `${trimmedName} leftovers`,
+          quantity: 1,
+          unit: "portion",
+          storageZone: "fridge",
+          expiryDate: expiryDate ?? undefined,
+          createdDate: today,
+          usedCount: 0,
+        });
+        await repo.insert(item);
+        upsertItem(item);
+        HabitService.record("pantry_item_added");
+        await refreshExpiryBuckets();
+        return true;
+      } catch (e) {
+        log.error("Could not save leftovers to pantry", e);
+        setError("Could not save leftovers.");
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [suggestShelfLife, upsertItem, refreshExpiryBuckets],
+  );
+
   const itemViewModels = useMemo(() => {
     return sortPantryItems(items).map(toPantryItemViewModel);
   }, [items]);
@@ -320,7 +629,17 @@ export const usePantryController = () => {
     updateItem,
     removeItemById,
     markItemUsed,
+    removalPrompt,
+    clearRemovalPrompt,
     logWasteForItem,
+    suggestShelfLife,
+    getPrioritisedSuggestionItems,
+    markItemsSurfaced,
+    suggestFromPantry,
+    swapSuggestion,
+    generateRecipeFromIdea,
+    findRecipeForSuggestion,
+    saveLeftoversFromCook,
     items: itemViewModels,
     wasteAlert,
     loading,

@@ -54,8 +54,12 @@ export const useTodaysMenuCard = (): TodaysMenuCardViewModel => {
 
       const resolved: TodaysMenuItem[] = [];
       for (const slot of slots) {
-        const recipe = await recipeRepo.fetchById(slot.recipeId);
-        if (recipe) resolved.push({ type: slot.type, title: recipe.title });
+        if (slot.recipeId) {
+          const recipe = await recipeRepo.fetchById(slot.recipeId);
+          if (recipe) resolved.push({ type: slot.type, title: recipe.title });
+        } else if (slot.note) {
+          resolved.push({ type: slot.type, title: slot.note });
+        }
       }
       resolved.sort(
         (a, b) => SLOT_ORDER.indexOf(a.type) - SLOT_ORDER.indexOf(b.type),

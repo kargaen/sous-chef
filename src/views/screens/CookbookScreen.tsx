@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing, typography } from "@/constants";
-import { useCookbookController, useRecipeController } from "@/controllers";
+import { useCookbookController, useRecipeController, useRegisterAssistantContext } from "@/controllers";
 import type { RecipeCookStats } from "@/models/repositories";
 import type { Cookbook, Recipe } from "@/models/types";
 import { CookbookShelf } from "@/views/components/cookbook/CookbookShelf.view";
@@ -134,6 +134,39 @@ export default function CookbookScreen() {
   }, [cookbooks, parentCookbookId]);
   const isNestedCookbook = currentCookbookId !== null;
   const activeCookbookId = currentCookbook?.id ?? null;
+
+  useRegisterAssistantContext({
+    scope: {
+      kind: "cookbook",
+      cookbookId: activeCookbookId ?? undefined,
+      label: currentCookbook?.title ?? "Cookbooks",
+    },
+    promptSuggestions: [
+      {
+        id: "cookbook-suggest",
+        label: "Find a recipe",
+        prompt: currentCookbook
+          ? `Suggest a recipe that fits the theme of my "${currentCookbook.title}" cookbook.`
+          : "Suggest a recipe I could add to my collection.",
+        kind: "general",
+        scopeKinds: ["cookbook"],
+      },
+      {
+        id: "cookbook-pair",
+        label: "What pairs well?",
+        prompt: "What dishes or drinks would pair well with the style of this cookbook?",
+        kind: "general",
+        scopeKinds: ["cookbook"],
+      },
+      {
+        id: "cookbook-adapt",
+        label: "Adapt a dish",
+        prompt: "Can you help me adapt one of my recipes to a different dietary need or skill level?",
+        kind: "adaptation",
+        scopeKinds: ["cookbook", "recipe"],
+      },
+    ],
+  });
 
   useEffect(() => {
     setIsEditingCookbook(false);
@@ -348,8 +381,8 @@ export default function CookbookScreen() {
 
         {currentCookbook && isEditingCookbook ? (
           <View style={styles.manageCard}>
-            <View style={styles.manageCardHeader}>
-              <Text style={styles.manageCardTitle}>Edit cookbook</Text>
+            <View style={styles.cardHeader}>
+              <Text style={textStyles.sectionTitle}>Edit cookbook</Text>
             </View>
 
             <TextField
@@ -370,7 +403,7 @@ export default function CookbookScreen() {
               autoCorrect
             />
 
-            <View style={styles.manageCardActions}>
+            <View style={styles.cardActions}>
               <Button
                 label="Save"
                 size="sm"
@@ -391,16 +424,16 @@ export default function CookbookScreen() {
 
         {currentCookbook && isConfirmingDelete ? (
           <View style={styles.manageCard}>
-            <View style={styles.manageCardHeader}>
-              <Text style={styles.manageCardTitle}>Delete cookbook</Text>
-              <Text style={styles.manageCardCopy}>
+            <View style={styles.cardHeader}>
+              <Text style={textStyles.sectionTitle}>Delete cookbook</Text>
+              <Text style={styles.cardCopy}>
                 {parentCookbook
                   ? `Any recipes in the cookbook will get transferred to the ${parentCookbook.title} cookbook.`
                   : "Any recipes will be saved in the Recipes home screen."}
               </Text>
             </View>
 
-            <View style={styles.manageCardActions}>
+            <View style={styles.cardActions}>
               <Button
                 label="Delete cookbook"
                 size="sm"
@@ -453,9 +486,9 @@ export default function CookbookScreen() {
       <View style={styles.section}>
         {isAddingCookbook ? (
           <View style={styles.addBookCard}>
-            <View style={styles.addBookHeader}>
-              <Text style={styles.addBookTitle}>Add cookbook</Text>
-              <Text style={styles.addBookCopy}>
+            <View style={styles.cardHeader}>
+              <Text style={textStyles.sectionTitle}>Add cookbook</Text>
+              <Text style={styles.cardCopy}>
                 Start a new book on your shelf and gather related recipes in one
                 place.
               </Text>
@@ -479,7 +512,7 @@ export default function CookbookScreen() {
               autoCorrect
             />
 
-            <View style={styles.addBookActions}>
+            <View style={styles.cardActions}>
               <Button
                 label="Add"
                 onPress={() => {
@@ -556,25 +589,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
   },
 
-  addBookHeader: {
+  cardHeader: {
     gap: spacing.xs,
     marginBottom: spacing.lg,
   },
 
-  addBookTitle: {
-    fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-
-  addBookCopy: {
+  cardCopy: {
     fontSize: typography.size.sm,
     lineHeight: typography.lineHeight.sm,
     color: colors.text.secondary,
   },
 
-  addBookActions: {
+  cardActions: {
     marginTop: spacing.lg,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -625,28 +651,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
   },
 
-  manageCardHeader: {
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-
-  manageCardTitle: {
-    fontSize: typography.size.lg,
-    lineHeight: typography.lineHeight.lg,
-    fontWeight: typography.weight.bold,
-    color: colors.text.primary,
-  },
-
-  manageCardCopy: {
-    fontSize: typography.size.sm,
-    lineHeight: typography.lineHeight.sm,
-    color: colors.text.secondary,
-  },
-
-  manageCardActions: {
-    marginTop: spacing.lg,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-  },
 });

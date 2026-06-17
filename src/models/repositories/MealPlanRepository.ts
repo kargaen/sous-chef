@@ -7,7 +7,14 @@ export class MealPlanRepository {
       "SELECT data FROM meal_plans WHERE week_start_date = ?",
       [weekStartDate],
     );
-    return row ? JSON.parse(row.data) : null;
+    return row ? (JSON.parse(row.data) as WeekPlan) : null;
+  }
+
+  async listAll(): Promise<WeekPlan[]> {
+    const rows = StorageService.dbQuery<{ data: string }>(
+      "SELECT data FROM meal_plans ORDER BY week_start_date DESC",
+    );
+    return rows.map((row) => JSON.parse(row.data) as WeekPlan);
   }
 
   async save(plan: WeekPlan): Promise<void> {

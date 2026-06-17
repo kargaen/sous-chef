@@ -3,6 +3,11 @@
 // falling back to stripped page text. Runs on the device, so there is no CORS
 // limitation on native (web builds are still subject to CORS — see Findings).
 
+import type { ChefProfile, Recipe } from "@/models/types";
+import { buildRecipeImportPrompt, buildSystemPrompt } from "@/prompts";
+import { LLMService } from "@/services/LLMService";
+import { buildRecipeFromInput, parseRecipeDraftFromLLM } from "@/utils/recipeBuilder";
+
 const FETCH_TIMEOUT_MS = 12000;
 const MAX_TEXT_LENGTH = 12000;
 const MIN_USEFUL_LENGTH = 40;
@@ -115,5 +120,28 @@ export const RecipeImportService = {
     }
 
     return trimmed;
+  },
+
+  // Generates a Recipe from a free-text idea via the LLM. Returns null on
+  // failure. The caller is responsible for persisting the returned recipe.
+  generateRecipeFromIdea: async (
+    idea: string,
+    profile: ChefProfile,
+  ): Promise<Recipe | null> => {
+    try {
+      const response = await LLMService.send({
+        system: buildSystemPrompt(profile),
+        messages: [
+          {
+            role: "user",
+            content: buildRecipeImportPrompt({ sourceMode: "idea", source: idea }),
+          },
+        ],
+      });
+      const draft = parseRecipeDraftFromLLM(response.content);
+      return buildRecipeFromInput(draft);
+    } catch {
+      return null;
+    }
   },
 };

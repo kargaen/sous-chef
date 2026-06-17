@@ -12,6 +12,12 @@ export const PantryItemSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expiry date must be YYYY-MM-DD")
     .optional(),
+  createdDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Created date must be YYYY-MM-DD")
+    .optional(),
+  usedCount: z.number().int().nonnegative().default(0),
+  lastSurfacedAt: z.string().optional(),
 });
 
 export const PantryItemInputSchema = PantryItemSchema.omit({

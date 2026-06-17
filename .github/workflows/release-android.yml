@@ -1,0 +1,74 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    branches: [main]
+
+# Cancel any in-flight build when a newer commit arrives on main.
+# Note: the EAS cloud build itself is not cancelled — only the GH Actions
+# runner is. EAS credits are consumed either way; keep pushes intentional.
+concurrency:
+  group: release-android
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Android APK (EAS preview)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # expo/expo-github-action installs EAS CLI and authenticates via EXPO_TOKEN.
+      # Add EXPO_TOKEN as a repository secret in GitHub → Settings → Secrets.
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Build the APK in EAS cloud. --json emits the build metadata to stdout
+      # once the build completes. stderr is redirected so jq only sees JSON.
+      - name: Build APK via EAS
+        id: build
+        run: |
+          BUILD_JSON=$(eas build \
+            --platform android \
+            --profile preview \
+            --non-interactive \
+            --json \
+            2>/dev/null)
+          ARTIFACT_URL=$(echo "$BUILD_JSON" | jq -r '.[0].artifacts.buildUrl')
+          echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+
+      - name: Download APK
+        run: curl -fL "${{ steps.build.outputs.artifact_url }}" -o sous-chef.apk
+
+      - name: Get short commit SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # Creates a versioned GitHub Release and attaches the APK.
+      # Each push to main gets its own build-N release tag.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Build #${{ github.run_number }} — ${{ steps.sha.outputs.short }}"
+          body: |
+            Automated Android build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
+
+            **Install:** download `sous-chef.apk` and open it on your Android device.
+            You may need to allow installation from unknown sources in your device settings.
+          files: sous-chef.apk
+          prerelease: true

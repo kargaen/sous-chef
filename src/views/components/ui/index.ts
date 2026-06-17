@@ -1,4 +1,5 @@
 export * from "./Badge";
+export * from "./EmptyState";
 export * from "./AutoPickerField";
 export * from "./Button";
 export * from "./Divider";

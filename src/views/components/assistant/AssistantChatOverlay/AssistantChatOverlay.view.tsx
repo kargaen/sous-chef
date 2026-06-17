@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useMemo } from "react";
 
+import type { PantryAddSuggestionPayload } from "@/models/types";
 import type { ConversationViewModel } from "@/controllers";
 import { getDefaultAssistantGreeting } from "@/controllers";
 import { AssistantChatSurface } from "../AssistantChatSurface";
@@ -15,11 +16,13 @@ import { styles } from "./AssistantChatOverlay.styles";
 export interface AssistantChatOverlayProps {
   conversation: ConversationViewModel;
   onClose: () => void;
+  onConfirmPantryAdd?: (payload: PantryAddSuggestionPayload) => void;
 }
 
 export function AssistantChatOverlay({
   conversation,
   onClose,
+  onConfirmPantryAdd,
 }: AssistantChatOverlayProps) {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardState();
@@ -61,6 +64,7 @@ export function AssistantChatOverlay({
             onChangeDraft={conversation.onChangeDraft}
             onSend={conversation.onSend}
             emptyStateText={greeting}
+            onConfirmPantryAdd={onConfirmPantryAdd}
           />
           {conversation.blockedNotification ? (
             <Text style={styles.blockedNotice} pointerEvents="none">
