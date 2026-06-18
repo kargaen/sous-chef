@@ -3,12 +3,11 @@ name: Build & Release Android APK
 on:
   push:
     branches: [master]
+    tags: ['v*']
 
-# Cancel any in-flight build when a newer commit arrives on master.
-# Note: the EAS cloud build itself is not cancelled — only the GH Actions
-# runner is. EAS credits are consumed either way; keep pushes intentional.
+# Separate concurrency per ref — tag builds don't cancel master builds.
 concurrency:
-  group: release-android
+  group: release-android-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,17 +59,35 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      # Creates a versioned GitHub Release and attaches the APK.
-      # Each push to main gets its own build-N release tag.
+      # Tag builds use the semver tag as the release name.
+      # Master branch builds fall back to the build-N naming.
+      - name: Resolve release metadata
+        id: release
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+            if [[ "$TAG" == *-rc* ]] || [[ "$TAG" == *-alpha* ]] || [[ "$TAG" == *-beta* ]]; then
+              echo "prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "prerelease=false" >> $GITHUB_OUTPUT
+            fi
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "name=$TAG — ${{ steps.sha.outputs.short }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=build-${{ github.run_number }}" >> $GITHUB_OUTPUT
+            echo "name=Build #${{ github.run_number }} — ${{ steps.sha.outputs.short }}" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: "Build #${{ github.run_number }} — ${{ steps.sha.outputs.short }}"
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.name }}
           body: |
-            Automated Android build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
+            Android build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
 
             **Install:** download `sous-chef.apk` and open it on your Android device.
             You may need to allow installation from unknown sources in your device settings.
           files: sous-chef.apk
-          prerelease: true
+          prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
