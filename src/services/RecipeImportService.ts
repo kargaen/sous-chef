@@ -6,7 +6,10 @@
 import type { ChefProfile, Recipe } from "@/models/types";
 import { buildRecipeImportPrompt, buildSystemPrompt } from "@/prompts";
 import { LLMService } from "@/services/LLMService";
+import { createLogger } from "@/utils/logger";
 import { buildRecipeFromInput, parseRecipeDraftFromLLM } from "@/utils/recipeBuilder";
+
+const log = createLogger("RecipeImportService");
 
 const FETCH_TIMEOUT_MS = 12000;
 const MAX_TEXT_LENGTH = 12000;
@@ -111,14 +114,22 @@ export const RecipeImportService = {
   // Throws on network failure, non-OK status, timeout, or a page with no usable
   // content. The caller turns that into a friendly companion message.
   fetchReadableRecipeText: async (url: string): Promise<string> => {
+    log.info("Fetching recipe page", { url });
     const html = await fetchHtml(normalizeUrl(url));
-    const content = extractJsonLdRecipe(html) ?? htmlToText(html);
+    const jsonLd = extractJsonLdRecipe(html);
+    const content = jsonLd ?? htmlToText(html);
     const trimmed = content.slice(0, MAX_TEXT_LENGTH);
 
     if (trimmed.trim().length < MIN_USEFUL_LENGTH) {
+      log.warn("No useful content extracted from page", { url, length: trimmed.length });
       throw new Error("No readable recipe content found on the page");
     }
 
+    log.debug("Page content extracted", {
+      url,
+      source: jsonLd ? "json-ld" : "html-text",
+      length: trimmed.length,
+    });
     return trimmed;
   },
 
@@ -128,6 +139,7 @@ export const RecipeImportService = {
     idea: string,
     profile: ChefProfile,
   ): Promise<Recipe | null> => {
+    log.info("Generating recipe from idea", { idea: idea.slice(0, 80) });
     try {
       const response = await LLMService.send({
         system: buildSystemPrompt(profile),
@@ -139,8 +151,11 @@ export const RecipeImportService = {
         ],
       });
       const draft = parseRecipeDraftFromLLM(response.content);
-      return buildRecipeFromInput(draft);
-    } catch {
+      const recipe = buildRecipeFromInput(draft);
+      log.info("Recipe generated", { title: recipe.title, id: recipe.id });
+      return recipe;
+    } catch (error) {
+      log.error("Failed to generate recipe from idea", error);
       return null;
     }
   },

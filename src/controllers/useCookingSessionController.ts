@@ -8,6 +8,9 @@ import type { Recipe, SuggestionContext } from "@/models/types";
 import { useCookSessionStore } from "@/store/cookSessionStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useRegisterAssistantContext } from "./useRegisterAssistantContext";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("useCookingSessionController");
 
 const recipeRepo = new RecipeRepository();
 const settingsRepo = new SettingsRepository();
@@ -36,12 +39,21 @@ export const useCookingSessionController = (recipeId: string) => {
     setLoading(true);
     setError(null);
 
+    log.info("Starting cooking session", { recipeId });
     void recipeRepo
       .fetchById(recipeId)
       .then((fetched) => {
-        if (activeIdRef.current === recipeId) setRecipe(fetched);
+        if (activeIdRef.current === recipeId) {
+          if (fetched) {
+            log.debug("Recipe loaded for cooking", { title: fetched.title });
+          } else {
+            log.warn("Recipe not found for cooking session", { recipeId });
+          }
+          setRecipe(fetched);
+        }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        log.error("Could not load recipe for cooking session", error);
         if (activeIdRef.current === recipeId) setError("Could not load recipe.");
       })
       .finally(() => setLoading(false));
@@ -112,6 +124,7 @@ export const useCookingSessionController = (recipeId: string) => {
   // Record the cook without going through the rating screen (the cook still
   // counts; the rating is simply skipped).
   const finishWithoutRating = (): void => {
+    log.info("Cook finished without rating", { recipeId });
     cookLogRepo.recordCook({ recipeId });
   };
 

@@ -2,6 +2,9 @@ import { useState } from "react";
 import { SettingsRepository } from "../models/repositories";
 import type { AppSettings } from "../models/types";
 import { useSettingsStore } from "../store/settingsStore";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("useSettingsController");
 
 const repo = new SettingsRepository();
 
@@ -12,13 +15,16 @@ export const useSettingsController = () => {
     useSettingsStore();
 
   const loadSettings = async (): Promise<void> => {
+    log.debug("Loading settings");
     setLoading(true);
     setError(null);
 
     try {
       const loadedSettings = await repo.get();
       setSettings(loadedSettings);
-    } catch {
+      log.debug("Settings loaded");
+    } catch (error) {
+      log.error("Could not load settings", error);
       setError("Could not load settings.");
     } finally {
       setLoading(false);
@@ -26,13 +32,16 @@ export const useSettingsController = () => {
   };
 
   const saveSettings = async (input: AppSettings): Promise<void> => {
+    log.info("Saving settings");
     setLoading(true);
     setError(null);
 
     try {
       const savedSettings = await repo.save(input);
       setSettings(savedSettings);
-    } catch {
+      log.info("Settings saved");
+    } catch (error) {
+      log.error("Could not save settings", error);
       setError("Could not save settings.");
     } finally {
       setLoading(false);
@@ -40,6 +49,7 @@ export const useSettingsController = () => {
   };
 
   const updateField = async (partial: Partial<AppSettings>): Promise<void> => {
+    log.debug("Updating settings field", { keys: Object.keys(partial) });
     setError(null);
 
     try {
@@ -49,19 +59,23 @@ export const useSettingsController = () => {
 
       updateSettings(partial);
       setSettings(savedSettings);
-    } catch {
+    } catch (error) {
+      log.error("Could not update settings field", error);
       setError("Could not update settings.");
     }
   };
 
   const resetSettings = async (): Promise<void> => {
+    log.info("Resetting settings to defaults");
     setLoading(true);
     setError(null);
 
     try {
       const resetSettingsValue = await repo.reset();
       setSettings(resetSettingsValue);
-    } catch {
+      log.info("Settings reset complete");
+    } catch (error) {
+      log.error("Could not reset settings", error);
       setError("Could not reset settings.");
     } finally {
       setLoading(false);

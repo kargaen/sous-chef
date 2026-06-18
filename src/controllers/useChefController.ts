@@ -4,6 +4,9 @@ import { ChefProfileSchema } from "../models/schemas/ChefProfileSchema";
 import type { ChefProfile, SkillLevel } from "../models/types";
 import { HabitService } from "../services/HabitService";
 import { useChefProfileStore } from "../store/chefProfileStore";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("useChefController");
 
 const repo = new ChefProfileRepository();
 const DEFAULT_CURRENCY = "USD";
@@ -25,15 +28,20 @@ export const useChefController = () => {
     useChefProfileStore();
 
   const loadProfile = async (): Promise<void> => {
+    log.debug("Loading chef profile");
     setLoading(true);
     setError(null);
 
     try {
       const loadedProfile = await repo.get();
       if (loadedProfile) {
+        log.info("Chef profile loaded", { name: loadedProfile.name, skillLevel: loadedProfile.skillLevel });
         setProfile(loadedProfile);
+      } else {
+        log.info("No chef profile found — first run or reset");
       }
-    } catch {
+    } catch (error) {
+      log.error("Could not load chef profile", error);
       setError("Could not load profile.");
     } finally {
       setLoading(false);
@@ -41,12 +49,15 @@ export const useChefController = () => {
   };
 
   const saveProfile = async (input: ChefProfile): Promise<void> => {
+    log.info("Saving chef profile", { name: input.name });
     setLoading(true);
     try {
       const validated = ChefProfileSchema.parse(input);
       await repo.save(validated);
       setProfile(validated);
-    } catch {
+      log.info("Chef profile saved", { id: validated.id });
+    } catch (error) {
+      log.error("Could not save chef profile", error);
       setError("Could not save profile.");
     } finally {
       setLoading(false);
@@ -56,6 +67,7 @@ export const useChefController = () => {
   const saveProfileDraft = async (
     input: SaveChefProfileDraftInput,
   ): Promise<void> => {
+    log.info("Saving chef profile draft", { name: input.name, skillLevel: input.skillLevel });
     setLoading(true);
     setError(null);
 
@@ -78,7 +90,9 @@ export const useChefController = () => {
 
       await repo.save(nextProfile);
       setProfile(nextProfile);
-    } catch {
+      log.info("Chef profile draft saved", { id: nextProfile.id });
+    } catch (error) {
+      log.error("Could not save chef profile draft", error);
       setError("Could not save profile.");
     } finally {
       setLoading(false);
@@ -86,6 +100,7 @@ export const useChefController = () => {
   };
 
   const updateField = async (partial: Partial<ChefProfile>): Promise<void> => {
+    log.debug("Updating profile field", { keys: Object.keys(partial) });
     setError(null);
 
     try {
@@ -94,7 +109,8 @@ export const useChefController = () => {
       const updated = { ...current, ...partial };
       await repo.save(updated);
       updateProfile(partial);
-    } catch {
+    } catch (error) {
+      log.error("Could not update chef profile field", error);
       setError("Could not update profile.");
     }
   };

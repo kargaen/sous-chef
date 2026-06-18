@@ -15,6 +15,9 @@ import { AdaptationService } from "@/services/AdaptationService";
 import { LLMService } from "@/services/LLMService";
 import { useChefProfileStore } from "@/store/chefProfileStore";
 import { useSettingsStore } from "@/store/settingsStore";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("useAdaptationController");
 
 export type AdaptationPhase =
   | "idle"
@@ -166,6 +169,7 @@ export function useAdaptationController(
   ): Promise<void> => {
     if (!recipe || !profile) return;
 
+    log.info("Running adaptation", { recipeId: recipe.id, historyLength: history.length });
     setError(null);
     setPhase("adapting");
 
@@ -186,15 +190,18 @@ export function useAdaptationController(
 
       const parsed = parseAdaptationResponse(response.content);
       if (!parsed) {
+        log.warn("Adaptation response parse failed", { recipeId: recipe.id });
         setError("The adaptation came back in an unexpected format. Try again.");
         setPhase("ready");
         return;
       }
 
+      log.info("Adaptation complete", { recipeId: recipe.id, hasIngredientChanges: (parsed.ingredientChanges?.length ?? 0) > 0 });
       setResult(parsed);
       if (parsed.summary) appendMessage("assistant", parsed.summary);
       setPhase("adapted");
-    } catch {
+    } catch (error) {
+      log.error("Adaptation LLM call failed", error);
       setError("Could not run the adaptation.");
       setPhase("ready");
     }
@@ -247,7 +254,8 @@ export function useAdaptationController(
 
       appendMessage("assistant", response.content);
       setPhase("ready");
-    } catch {
+    } catch (error) {
+      log.error("Adaptation planning call failed", error);
       setError("Could not reach the sous chef.");
       setPhase(history.length > 1 ? "ready" : "idle");
     }
@@ -283,12 +291,14 @@ export function useAdaptationController(
   const onSaveVariant = async (): Promise<void> => {
     if (!recipe || !result || phase !== "adapted") return;
 
+    log.info("Saving adaptation variant", { parentId: recipe.id });
     setError(null);
     setIsSavingVariant(true);
 
     try {
       const variant = AdaptationService.buildVariantRecipe(recipe, result);
       await recipeRepository.save(variant);
+      log.info("Variant saved", { variantId: variant.id });
 
       // A variant inherits its parent's rating dimensions rather than
       // generating new ones, so ratings stay comparable across the family.
@@ -305,7 +315,8 @@ export function useAdaptationController(
       }
 
       setPhase("saved");
-    } catch {
+    } catch (error) {
+      log.error("Could not save adaptation variant", error);
       setError("Could not save the variant.");
     } finally {
       setIsSavingVariant(false);

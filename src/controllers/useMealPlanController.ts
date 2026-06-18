@@ -37,6 +37,9 @@ import { addDays, eachPlanDay, formatDayLabel, planStart, todayKey } from "../ut
 
 import { PantryRepository } from "../models/repositories/PantryRepository";
 import { PlanPresetRepository } from "../models/repositories/PlanPresetRepository";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("useMealPlanController");
 
 const mealPlanRepo = new MealPlanRepository();
 const recipeRepo = new RecipeRepository();
@@ -152,11 +155,18 @@ export const useMealPlanController = () => {
   };
 
   const loadPlanForWeek = async (weekStartDate: string): Promise<void> => {
+    log.info("Loading plan for week", { weekStartDate });
     setLoading(true);
     try {
       const plan = await mealPlanRepo.getByWeek(weekStartDate);
-      if (plan) setActivePlan(plan);
-    } catch {
+      if (plan) {
+        setActivePlan(plan);
+        log.debug("Plan loaded", { planId: plan.id, slots: plan.slots.length });
+      } else {
+        log.debug("No plan found for week", { weekStartDate });
+      }
+    } catch (error) {
+      log.error("Could not load meal plan", error);
       setError("Could not load meal plan.");
     } finally {
       setLoading(false);
@@ -219,10 +229,14 @@ export const useMealPlanController = () => {
     const slot = activePlan.slots.find((s) => s.id === slotId);
     if (!slot?.recipeId) return;
 
+    log.info("Applying slot adaptation", { slotId, description: description.slice(0, 60) });
     setLoading(true);
     try {
       const recipe = await recipeRepo.fetchById(slot.recipeId);
-      if (!recipe) return;
+      if (!recipe) {
+        log.warn("Recipe not found for adaptation", { recipeId: slot.recipeId });
+        return;
+      }
 
       const response = await LLMService.send({
         system: buildSystemPrompt(profile),
@@ -246,10 +260,16 @@ export const useMealPlanController = () => {
       }
 
       const validated = AdaptationResponseSchema.safeParse(parsed);
-      if (!validated.success) return;
+      if (!validated.success) {
+        log.warn("Adaptation response failed schema validation", {
+          issues: validated.error.issues.length,
+        });
+        return;
+      }
 
       const variant = AdaptationService.buildVariantRecipe(recipe, validated.data);
       await recipeRepo.save(variant);
+      log.info("Adaptation variant saved", { variantId: variant.id, slotId });
 
       await persistPlan({
         ...activePlan,
@@ -263,7 +283,8 @@ export const useMealPlanController = () => {
           (a) => !(a.slotId === slotId && a.description === description),
         ),
       );
-    } catch {
+    } catch (error) {
+      log.error("Could not apply adaptation", error);
       setError("Could not apply adaptation.");
     } finally {
       setLoading(false);
@@ -341,7 +362,16 @@ export const useMealPlanController = () => {
     if (!activePlan) return;
 
     const parsed = parseSlotInput(input);
-    if (!parsed.recipeId && !parsed.note) return;
+    if (!parsed.recipeId && !parsed.note) {
+      log.warn("submitSlotInput: nothing to persist after parsing", { date, type });
+      return;
+    }
+    log.debug("Submitting slot", {
+      date,
+      type,
+      recipeId: parsed.recipeId,
+      adaptations: parsed.adaptationIntents.length,
+    });
 
     const slotId = newSlotId();
     const newSlot: MealSlot = {
@@ -471,6 +501,7 @@ export const useMealPlanController = () => {
     weekStartDate: string,
     dates?: string[],
   ): Promise<void> => {
+    log.debug("Deriving shopping list", { weekStartDate, dates });
     try {
       const list = await shoppingRepo.deriveForDates(weekStartDate, dates);
       // Preserve checked ticks for items that still appear after re-derive.
@@ -485,9 +516,11 @@ export const useMealPlanController = () => {
               checkedIds.has(item.id) ? { ...item, checked: true } : item,
             ),
           }));
+      log.info("Shopping list derived", { groups: merged.length });
       setShoppingList(merged);
       HabitService.record("shopping_list_viewed");
-    } catch {
+    } catch (error) {
+      log.error("Could not derive shopping list", error);
       setError("Could not derive shopping list.");
     }
   };
@@ -535,6 +568,10 @@ export const useMealPlanController = () => {
     usePantry = false,
   ): Promise<void> => {
     if (!activePlan || !request.trim()) return;
+    log.info("Generating plan draft from request", {
+      request: request.slice(0, 80),
+      usePantry,
+    });
     setLoading(true);
     try {
       const today = todayKey();
@@ -575,10 +612,12 @@ export const useMealPlanController = () => {
         note: slot.note,
       }));
 
+      log.info("Plan draft generated", { suggestions: newSuggestions.length });
       // Replace any existing draft slots (re-generating replaces the previous draft).
       setDraftSlots(newSuggestions);
       HabitService.record("meal_plan_created");
-    } catch {
+    } catch (error) {
+      log.error("Could not draft meal plan", error);
       setError("Could not draft meal plan. Please try again.");
     } finally {
       setLoading(false);

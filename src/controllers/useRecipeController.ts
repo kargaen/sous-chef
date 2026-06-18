@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { CookLogRepository } from "../models/repositories/CookLogRepository";
 import type { RecipeCookStats } from "../models/repositories/CookLogRepository";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("useRecipeController");
 import { RecipeRepository } from "../models/repositories/RecipeRepository";
 import type { Recipe } from "../models/types";
 import {
@@ -59,6 +62,7 @@ export const useRecipeController = () => {
   );
 
   const search = async (query: string): Promise<void> => {
+    log.debug("Searching recipes", { query });
     setLoading(true);
     setError(null);
     try {
@@ -76,8 +80,10 @@ export const useRecipeController = () => {
         );
         return !hasDisliked && !hasExcludedTag;
       });
+      log.debug("Search results", { query, found: filtered.length });
       setResults(filtered);
-    } catch {
+    } catch (error) {
+      log.error("Recipe search failed", error);
       setError("Could not search recipes.");
     } finally {
       setLoading(false);
@@ -85,12 +91,19 @@ export const useRecipeController = () => {
   };
 
   const fetchById = async (id: string): Promise<void> => {
+    log.debug("Fetching recipe by id", { id });
     setLoading(true);
     setError(null);
     try {
       const recipe = await repo.fetchById(id);
+      if (recipe) {
+        log.debug("Recipe fetched", { id, title: recipe.title });
+      } else {
+        log.warn("Recipe not found", { id });
+      }
       setActiveRecipe(recipe);
-    } catch {
+    } catch (error) {
+      log.error("Could not load recipe", error);
       setError("Could not load recipe.");
     } finally {
       setLoading(false);
@@ -125,6 +138,7 @@ export const useRecipeController = () => {
   };
 
   const saveRecipe = async (recipe: Recipe): Promise<Recipe | null> => {
+    log.info("Saving recipe", { id: recipe.id, title: recipe.title });
     setLoading(true);
     setError(null);
     try {
@@ -134,7 +148,8 @@ export const useRecipeController = () => {
       // a moment later without blocking the save.
       void generateDimensionsIfMissing(recipe);
       return recipe;
-    } catch {
+    } catch (error) {
+      log.error("Could not save recipe", error);
       setError("Could not save recipe.");
       return null;
     } finally {
@@ -172,6 +187,7 @@ export const useRecipeController = () => {
       return null;
     }
 
+    log.info("Saving recipe edits", { id: original.id, title: edits.title });
     setLoading(true);
     setError(null);
     try {
@@ -194,8 +210,10 @@ export const useRecipeController = () => {
       await repo.save(updated);
       setActiveRecipe(updated);
       HabitService.record("recipe_saved");
+      log.info("Recipe edits saved", { id: updated.id });
       return updated;
-    } catch {
+    } catch (error) {
+      log.error("Could not save recipe edits", error);
       setError("Could not save your changes.");
       return null;
     } finally {
@@ -309,6 +327,7 @@ Apply the requested change and return the full updated recipe.`,
     sourceMode,
     source,
   }: ImportRecipeSourceInput): Promise<RecipeBuilderInput | null> => {
+    log.info("Importing recipe", { sourceMode, sourceLength: source.length });
     const trimmedSource = source.trim();
 
     if (!trimmedSource) {
@@ -340,7 +359,8 @@ Apply the requested change and return the full updated recipe.`,
         sourceText = await RecipeImportService.fetchReadableRecipeText(
           trimmedSource,
         );
-      } catch {
+      } catch (error) {
+        log.error("URL fetch failed during recipe import", error);
         showCompanion(
           "happy",
           "I couldn't read that page — some sites block apps or hide the recipe behind a login. Try pasting the recipe text into the Paste tab instead.",
@@ -366,8 +386,11 @@ Apply the requested change and return the full updated recipe.`,
         ],
       });
 
-      return parseRecipeDraftFromLLM(response.content);
-    } catch {
+      const draft = parseRecipeDraftFromLLM(response.content);
+      log.info("Recipe import parsed", { title: draft.title });
+      return draft;
+    } catch (error) {
+      log.error("Recipe import LLM call failed", error);
       showCompanion(
         "exhausted",
         "Sous Chef is a little exhausted and couldn't shape that recipe right now. Give me a moment and try again.",

@@ -22,6 +22,9 @@ import { useChefProfileStore } from "@/store/chefProfileStore";
 import { useConversationStore } from "@/store/conversationStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { trimContextWindow } from "@/utils/contextWindow";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("useConversationController");
 
 const recipeRepository = new RecipeRepository();
 
@@ -170,6 +173,7 @@ export function useConversationController(
   ): Promise<{ tone: "happy" | "exhausted" }> => {
     if (!text || !profile) return { tone: "happy" };
 
+    log.debug("Sending message", { length: text.length });
     // Clear any previous blocked notification as soon as a new message is attempted
     setBlockedNotification(null);
 
@@ -183,6 +187,7 @@ export function useConversationController(
 
     // T0: hard stop — show notification, store nothing
     if (safetyLabel === "T0") {
+      log.warn("Message hard-blocked at T0");
       setBlockedNotification(T0_BLOCKED_RESPONSE);
       return { tone: "exhausted" };
     }
@@ -290,6 +295,7 @@ export function useConversationController(
       // Layer 3: scan the output before displaying it
       const outputBlocked = await SafetyService.scanOutput(response.content);
       if (outputBlocked) {
+        log.warn("Output blocked at Layer 3 — message suppressed");
         // Remove the user message that was already added — store nothing from this exchange
         setMessages(useConversationStore.getState().messages.slice(0, -1));
         setBlockedNotification(T0_BLOCKED_RESPONSE);
@@ -330,9 +336,11 @@ export function useConversationController(
         scope: resolvedScope,
       });
 
+      log.info("Message exchange complete", { safetyLabel, scope: resolvedScope.kind });
       HabitService.record("chat_opened");
       return { tone: isUnsafe ? "exhausted" : "happy" };
-    } catch {
+    } catch (error) {
+      log.error("Conversation send failed", error);
       setError("Could not send message.");
       return { tone: "happy" };
     } finally {

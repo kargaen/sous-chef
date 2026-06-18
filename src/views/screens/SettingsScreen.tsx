@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { spacing } from "@/constants";
 import { Button, Spinner, TextField } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
+import { clearLogBuffer, exportLogs } from "@/utils/logger";
 
 import { useSettingsScreenView } from "./SettingsScreen.hooks";
 import { styles } from "./SettingsScreen.styles";
@@ -520,6 +521,35 @@ export default function SettingsScreen() {
                   })}
                 </View>
               </View>
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Diagnostic log</Text>
+              <Text style={styles.cardCopy}>
+                Exports the in-memory log buffer (last 500 entries). Share it
+                as a file or copy it to the clipboard for debugging.
+              </Text>
+            </View>
+            <View style={styles.fieldGroup}>
+              <Button
+                label="Share log"
+                variant="secondary"
+                size="sm"
+                onPress={() => {
+                  void Share.share({
+                    title: "Sous Chef diagnostic log",
+                    message: exportLogs(),
+                  });
+                }}
+              />
+              <Button
+                label="Clear log buffer"
+                variant="ghost"
+                size="sm"
+                onPress={clearLogBuffer}
+              />
             </View>
           </View>
         </View>
