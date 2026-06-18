@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing, typography } from "@/constants";
 import { usePantryController } from "@/controllers/usePantryController";
 import { useRegisterAssistantContext } from "@/controllers";
+import type { SuggestionSlot } from "@/models/types";
 import type { PantrySuggestion } from "@/prompts/pantrySuggestions";
+import { useMealPlanStore } from "@/store/mealPlanStore";
 import { createLogger } from "@/utils/logger";
+import { eachPlanDay, formatDayLabel, todayKey } from "@/utils/planDateUtils";
 import { EMPTY_PANTRY_ITEM_DRAFT } from "@/utils/pantry";
 import {
   AddPantryItemForm,
@@ -32,6 +35,7 @@ export default function PantryScreen() {
     clearRemovalPrompt,
     suggestShelfLife,
     suggestFromPantry,
+    suggestForItem,
     swapSuggestion,
     findRecipeForSuggestion,
     generateRecipeFromIdea,
@@ -43,8 +47,14 @@ export default function PantryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const activePlan = useMealPlanStore((s) => s.activePlan);
+  const draftSlots = useMealPlanStore((s) => s.draftSlots);
+  const setDraftSlots = useMealPlanStore((s) => s.setDraftSlots);
+
   const [showForm, setShowForm] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [pendingPlanRecipeId, setPendingPlanRecipeId] = useState<string | null>(null);
+  const [pendingPlanTitle, setPendingPlanTitle] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<AddPantryItemFormValues>(
     EMPTY_PANTRY_ITEM_DRAFT,
   );
@@ -115,6 +125,13 @@ export default function PantryScreen() {
   const editingItem = useMemo(() => {
     return items.find((item) => item.id === editingItemId) ?? null;
   }, [editingItemId, items]);
+
+  const planDays = useMemo(() => {
+    if (!activePlan) return [];
+    return eachPlanDay(activePlan.weekStartDate, activePlan.dayCount);
+  }, [activePlan]);
+
+  const today = todayKey();
 
   const visibleWasteAlert =
     wasteAlert && dismissedAlertItemId !== wasteAlert.itemId ? wasteAlert : null;
@@ -233,19 +250,55 @@ export default function PantryScreen() {
     }
   };
 
+  const handleUseInRecipe = async () => {
+    if (!editingItemId) return;
+    const item = items.find((i) => i.id === editingItemId);
+    if (!item) return;
+    setSuggestLoading(true);
+    try {
+      const result = await suggestForItem(item.name);
+      if (result) {
+        setSuggestions((prev) => [result, ...prev]);
+        closeEditor();
+      }
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
   const handleAddToPlan = async (suggestion: PantrySuggestion) => {
     setRecipeLoading(true);
     try {
       const existingId = await findRecipeForSuggestion(suggestion);
-      if (!existingId) {
+      let recipeId = existingId;
+      if (!recipeId) {
         const generated = await generateRecipeFromIdea(suggestion);
-        if (!generated) return; // generation failed — don't navigate with nothing saved
+        if (!generated) return;
+        recipeId = generated.id;
       }
-      // Recipe is saved — navigate to plan where the cook can add it by name
-      router.push({ pathname: "/(tabs)/plan" });
+      if (activePlan && planDays.length > 0) {
+        setPendingPlanRecipeId(recipeId);
+        setPendingPlanTitle(suggestion.title);
+      } else {
+        router.push({ pathname: "/(tabs)/plan" });
+      }
     } finally {
       setRecipeLoading(false);
     }
+  };
+
+  const handlePickPlanDay = (date: string) => {
+    if (!pendingPlanRecipeId) return;
+    const slot: SuggestionSlot = {
+      id: `slot_${Date.now()}`,
+      date,
+      type: "dinner",
+      suggestionText: pendingPlanTitle ?? pendingPlanRecipeId,
+    };
+    setDraftSlots([...draftSlots, slot]);
+    setPendingPlanRecipeId(null);
+    setPendingPlanTitle(null);
+    router.push({ pathname: "/(tabs)/plan" });
   };
 
   const handleLogWaste = async () => {
@@ -339,6 +392,13 @@ export default function PantryScreen() {
                 }
               : undefined
           }
+          onUseInRecipe={
+            editingItem
+              ? () => {
+                  void handleUseInRecipe();
+                }
+              : undefined
+          }
           onSuggestShelfLife={() => {
             void handleSuggestShelfLife();
           }}
@@ -420,6 +480,31 @@ export default function PantryScreen() {
         </View>
       ) : null}
 
+      {pendingPlanRecipeId && planDays.length > 0 ? (
+        <View style={dayPickerStyles.section}>
+          <Text style={textStyles.sectionTitle}>
+            Pick a day for "{pendingPlanTitle ?? "this recipe"}"
+          </Text>
+          <View style={dayPickerStyles.chips}>
+            {planDays.map((date) => (
+              <Pressable
+                key={date}
+                style={[
+                  dayPickerStyles.chip,
+                  date === today && dayPickerStyles.chipToday,
+                ]}
+                onPress={() => handlePickPlanDay(date)}
+              >
+                <Text style={dayPickerStyles.chipLabel}>{formatDayLabel(date)}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable onPress={() => { setPendingPlanRecipeId(null); setPendingPlanTitle(null); }}>
+            <Text style={dayPickerStyles.cancel}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <Divider />
 
       <View style={screenStyles.list}>
@@ -453,6 +538,46 @@ export default function PantryScreen() {
     </ScrollView>
   );
 }
+
+const dayPickerStyles = StyleSheet.create({
+  section: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.sm,
+  },
+
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+
+  chip: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    backgroundColor: colors.background.card,
+  },
+
+  chipToday: {
+    borderColor: colors.border.strong,
+    backgroundColor: colors.background.muted,
+  },
+
+  chipLabel: {
+    fontSize: typography.size.sm,
+    color: colors.text.primary,
+  },
+
+  cancel: {
+    fontSize: typography.size.sm,
+    color: colors.text.secondary,
+    alignSelf: "flex-start",
+    paddingVertical: spacing.xs,
+  },
+});
 
 const suggestionStyles = StyleSheet.create({
   section: {
