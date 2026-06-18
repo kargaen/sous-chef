@@ -4,6 +4,12 @@ on:
   push:
     branches: [master]
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.0.1-rc.1)'
+        required: true
+        type: string
 
 # Separate concurrency per ref — tag builds don't cancel master builds.
 concurrency:
@@ -59,13 +65,20 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      # Tag builds use the semver tag as the release name.
-      # Master branch builds fall back to the build-N naming.
+      # workflow_dispatch and tag builds use the version input / tag name.
+      # Master branch pushes fall back to the build-N naming.
       - name: Resolve release metadata
         id: release
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.version }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
             TAG="${{ github.ref_name }}"
+          else
+            TAG=""
+          fi
+
+          if [ -n "$TAG" ]; then
             if [[ "$TAG" == *-rc* ]] || [[ "$TAG" == *-alpha* ]] || [[ "$TAG" == *-beta* ]]; then
               echo "prerelease=true" >> $GITHUB_OUTPUT
             else
