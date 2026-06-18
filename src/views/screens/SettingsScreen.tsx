@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing } from "@/constants";
 import { Button, Spinner, TextField } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
+import { useUIStore } from "@/store/uiStore";
 import { clearLogBuffer, exportLogs } from "@/utils/logger";
 
 import { useSettingsScreenView } from "./SettingsScreen.hooks";
@@ -12,6 +13,7 @@ import { styles } from "./SettingsScreen.styles";
 export default function SettingsScreen() {
   const view = useSettingsScreenView();
   const insets = useSafeAreaInsets();
+  const debugModeEnabled = useUIStore((s) => s.debugModeEnabled);
 
   if (!view.hasLoaded) {
     return <Spinner label="Loading settings..." />;
@@ -468,7 +470,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {__DEV__ ? (
+      {(__DEV__ || debugModeEnabled) ? (
         <View style={styles.sectionBlock}>
           <Text style={styles.sectionEyebrow}>Debug</Text>
           <Text style={styles.sectionTitle}>Developer tools</Text>
