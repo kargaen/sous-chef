@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { type ReactNode, useRef } from "react";
 import {
@@ -48,6 +49,7 @@ export default function HomeScreen() {
   const showCompanion = useSousChefCompanionStore((s) => s.showCompanion);
 
   const handleLongPressMark = () => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     enableDebugMode();
     configureLogger({ minLevel: "debug" });
     showCompanion("happy", "Debug mode activated. Head to settings to export the log.", {
