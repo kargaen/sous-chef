@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing } from "@/constants";
 import { Button, Spinner, TextField } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
-import { useUIStore } from "@/store/uiStore";
 import { clearLogBuffer, exportLogs } from "@/utils/logger";
 
 import { useSettingsScreenView } from "./SettingsScreen.hooks";

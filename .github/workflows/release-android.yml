@@ -54,7 +54,7 @@ jobs:
             --profile preview \
             --non-interactive \
             --json \
-            2>/dev/null)
+            2>/tmp/eas-stderr.txt) || { echo "=== EAS error output ==="; cat /tmp/eas-stderr.txt; exit 1; }
           ARTIFACT_URL=$(echo "$BUILD_JSON" | jq -r '.[0].artifacts.buildUrl')
           echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
 
