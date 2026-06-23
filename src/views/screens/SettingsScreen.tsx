@@ -551,7 +551,6 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>
-      </View>
 
       <View style={styles.footerActions}>
         <Button
