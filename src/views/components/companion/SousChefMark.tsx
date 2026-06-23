@@ -18,7 +18,7 @@ export function SousChefMark({ size = 24, onLongPress }: SousChefMarkProps) {
 
   if (onLongPress) {
     return (
-      <Pressable onLongPress={onLongPress} delayLongPress={5000}>
+      <Pressable onLongPress={onLongPress} delayLongPress={3000}>
         {image}
       </Pressable>
     );
