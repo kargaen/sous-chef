@@ -48,14 +48,28 @@ export default function HomeScreen() {
   const enableDebugMode = useUIStore((s) => s.enableDebugMode);
   const showCompanion = useSousChefCompanionStore((s) => s.showCompanion);
 
-  const handleLongPressMark = () => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    enableDebugMode();
-    configureLogger({ minLevel: "debug" });
-    showCompanion("happy", "Debug mode activated. Head to settings to export the log.", {
-      label: "Open settings",
-      route: "/settings",
-    });
+  const markTapCount = useRef(0);
+  const markTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePressMark = () => {
+    if (markTapTimer.current) clearTimeout(markTapTimer.current);
+    markTapCount.current += 1;
+
+    if (markTapCount.current >= 6) {
+      markTapCount.current = 0;
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      enableDebugMode();
+      configureLogger({ minLevel: "debug" });
+      showCompanion("happy", "Debug mode activated. Head to settings to export the log.", {
+        label: "Open settings",
+        route: "/settings",
+      });
+      return;
+    }
+
+    markTapTimer.current = setTimeout(() => {
+      markTapCount.current = 0;
+    }, 1000);
   };
 
   // Pull-to-load (G.2): the gesture lives here on the scroller; the action lives
@@ -138,7 +152,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <HomeBriefingHeader feed={feed} onLongPressMark={handleLongPressMark} />
+        <HomeBriefingHeader feed={feed} onPressMark={handlePressMark} />
       </View>
 
       {feed.loading

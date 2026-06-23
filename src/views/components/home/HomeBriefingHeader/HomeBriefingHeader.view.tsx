@@ -28,17 +28,17 @@ const resolveContext = (feed: HomeFeedViewModel): HomeBriefingContext => {
 
 export interface HomeBriefingHeaderProps {
   feed: HomeFeedViewModel;
-  onLongPressMark?: () => void;
+  onPressMark?: () => void;
 }
 
-export function HomeBriefingHeader({ feed, onLongPressMark }: HomeBriefingHeaderProps) {
+export function HomeBriefingHeader({ feed, onPressMark }: HomeBriefingHeaderProps) {
   const name = useChefProfileStore((state) => state.profile?.name);
   const line = buildHomeBriefing(resolveContext(feed), name);
 
   return (
     <View style={styles.row}>
       <View style={styles.avatar}>
-        <SousChefMark size={30} onLongPress={onLongPressMark} />
+        <SousChefMark size={30} onPress={onPressMark} />
       </View>
       <Text style={styles.line}>{line}</Text>
     </View>

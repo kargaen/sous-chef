@@ -3,10 +3,10 @@ import { Pressable } from "react-native";
 
 interface SousChefMarkProps {
   size?: number;
-  onLongPress?: () => void;
+  onPress?: () => void;
 }
 
-export function SousChefMark({ size = 24, onLongPress }: SousChefMarkProps) {
+export function SousChefMark({ size = 24, onPress }: SousChefMarkProps) {
   const image = (
     <Image
       source={require("../../../assets/svg/companion-happy.svg")}
@@ -16,9 +16,9 @@ export function SousChefMark({ size = 24, onLongPress }: SousChefMarkProps) {
     />
   );
 
-  if (onLongPress) {
+  if (onPress) {
     return (
-      <Pressable onLongPress={onLongPress} delayLongPress={3000}>
+      <Pressable onPress={onPress}>
         {image}
       </Pressable>
     );

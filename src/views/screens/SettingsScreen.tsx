@@ -13,8 +13,6 @@ import { styles } from "./SettingsScreen.styles";
 export default function SettingsScreen() {
   const view = useSettingsScreenView();
   const insets = useSafeAreaInsets();
-  const debugModeEnabled = useUIStore((s) => s.debugModeEnabled);
-
   if (!view.hasLoaded) {
     return <Spinner label="Loading settings..." />;
   }
@@ -470,13 +468,12 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {(__DEV__ || debugModeEnabled) ? (
-        <View style={styles.sectionBlock}>
+      <View style={styles.sectionBlock}>
           <Text style={styles.sectionEyebrow}>Debug</Text>
           <Text style={styles.sectionTitle}>Developer tools</Text>
           <Text style={styles.sectionCopy}>
-            Only visible in development builds. These settings cannot be enabled
-            in production.
+            Tools for testing and debugging. Safety layer skip is always
+            enforced in compiled builds regardless of this toggle.
           </Text>
 
           <View style={styles.card}>
@@ -555,7 +552,7 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>
-      ) : null}
+      </View>
 
       <View style={styles.footerActions}>
         <Button
