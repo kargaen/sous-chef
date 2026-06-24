@@ -1,0 +1,71 @@
+name: Build & Release Android RC
+
+on:
+  push:
+    branches: [dev]
+
+concurrency:
+  group: rc-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Android APK (EAS RC)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build APK via EAS
+        id: build
+        run: |
+          BUILD_JSON=$(eas build \
+            --platform android \
+            --profile preview \
+            --non-interactive \
+            --json \
+            2>/tmp/eas-stderr.txt) || { echo "=== EAS error output ==="; cat /tmp/eas-stderr.txt; exit 1; }
+          ARTIFACT_URL=$(echo "$BUILD_JSON" | jq -r '.[0].artifacts.buildUrl')
+          echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+
+      - name: Download APK
+        run: curl -fL "${{ steps.build.outputs.artifact_url }}" -o sous-chef.apk
+
+      - name: Get short commit SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Read version from package.json
+        id: version
+        run: echo "value=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.value }}-dev.${{ github.run_number }}
+          name: ${{ steps.version.outputs.value }}-dev.${{ github.run_number }} — ${{ steps.sha.outputs.short }}
+          body: |
+            RC build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `dev`.
+
+            **Install:** download `sous-chef.apk` and open it on your Android device.
+            You may need to allow installation from unknown sources in your device settings.
+          files: sous-chef.apk
+          prerelease: true
