@@ -57,11 +57,11 @@ jobs:
         id: version
         run: echo "value=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
+      - name: Create or overwrite RC release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.value }}-dev.${{ github.run_number }}
-          name: ${{ steps.version.outputs.value }}-dev.${{ github.run_number }} — ${{ steps.sha.outputs.short }}
+          tag_name: v${{ steps.version.outputs.value }}
+          name: v${{ steps.version.outputs.value }} — ${{ steps.sha.outputs.short }}
           body: |
             RC build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `dev`.
 
