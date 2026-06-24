@@ -51,24 +51,65 @@ const toGeminiMessages = (request: LLMRequest) => ({
   })),
 });
 
+const SEND_TIMEOUT_MS = 45_000;
+const MAX_RETRIES = 2;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 export const googleProvider: LLMProvider = {
   send: async (request: LLMRequest): Promise<LLMResponse> => {
     const apiKey = await getApiKey();
     const model = getModel();
     const url = `${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(toGeminiMessages(request)),
-    });
+    const body = JSON.stringify(toGeminiMessages(request));
 
-    if (!response.ok) {
-      throw new Error(`Gemini request failed: ${response.status}`);
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          signal: controller.signal,
+        });
+
+        if (response.status === 503 || response.status === 429) {
+          throw new Error(`Gemini request failed: ${response.status}`);
+        }
+
+        if (!response.ok) {
+          throw new Error(`Gemini request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        return { content };
+      } catch (err) {
+        lastError = err;
+        const isAbort =
+          err instanceof Error && err.name === "AbortError";
+        const isRetryable =
+          isAbort ||
+          (err instanceof Error &&
+            (err.message.includes("503") ||
+              err.message.includes("429") ||
+              err.message.includes("Network request failed")));
+
+        if (isRetryable && attempt < MAX_RETRIES) {
+          await sleep(attempt === 0 ? 1500 : 3000);
+          continue;
+        }
+
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
     }
 
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    return { content };
+    throw lastError;
   },
 
   stream: async (
