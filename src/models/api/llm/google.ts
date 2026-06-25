@@ -76,10 +76,6 @@ export const googleProvider: LLMProvider = {
           signal: controller.signal,
         });
 
-        if (response.status === 503 || response.status === 429) {
-          throw new Error(`Gemini request failed: ${response.status}`);
-        }
-
         if (!response.ok) {
           throw new Error(`Gemini request failed: ${response.status}`);
         }
@@ -95,7 +91,6 @@ export const googleProvider: LLMProvider = {
           isAbort ||
           (err instanceof Error &&
             (err.message.includes("503") ||
-              err.message.includes("429") ||
               err.message.includes("Network request failed")));
 
         if (isRetryable && attempt < MAX_RETRIES) {
