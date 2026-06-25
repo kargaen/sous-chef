@@ -21,6 +21,7 @@ import { SafetyService } from "@/services/SafetyService";
 import { useChefProfileStore } from "@/store/chefProfileStore";
 import { useConversationStore } from "@/store/conversationStore";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useSousChefCompanionStore } from "@/store/sousChefCompanionStore";
 import { trimContextWindow } from "@/utils/contextWindow";
 import { createLogger } from "@/utils/logger";
 
@@ -167,6 +168,7 @@ export function useConversationController(
 
   const profile = useChefProfileStore((s) => s.profile);
   const settings = useSettingsStore((s) => s.settings);
+  const showCompanion = useSousChefCompanionStore((s) => s.showCompanion);
 
   const sendMessage = async (
     text: string,
@@ -233,19 +235,30 @@ export function useConversationController(
         const recipe = await recipeRepository.fetchById(resolvedScope.recipeId);
 
         if (recipe) {
-          const response = await LLMService.send({
-            system: resolvedSystemPrompt,
-            messages: [
-              {
-                role: "user",
-                content: buildAdaptationPrompt({
-                  recipe,
-                  reason: text,
-                  outputLanguage: forcedLanguage,
-                }),
+          const response = await LLMService.send(
+            {
+              system: resolvedSystemPrompt,
+              messages: [
+                {
+                  role: "user",
+                  content: buildAdaptationPrompt({
+                    recipe,
+                    reason: text,
+                    outputLanguage: forcedLanguage,
+                  }),
+                },
+              ],
+            },
+            "user",
+            {
+              onQueued: () => {
+                showCompanion("exhausted", "Still finishing something — your message is queued and will send in a moment.");
               },
-            ],
-          });
+              onRateLimited: () => {
+                showCompanion("exhausted", "Hit the rate limit — retrying automatically. No need to resend.");
+              },
+            },
+          );
 
           const structuredAdaptation = parseAdaptationResponse(response.content);
           addMessage({
@@ -268,29 +281,40 @@ export function useConversationController(
       const previousMessages = useConversationStore.getState().messages.slice(0, -1);
       const trimmed = trimContextWindow(previousMessages);
 
-      const response = await LLMService.send({
-        system: resolvedSystemPrompt,
-        messages: [
-          ...trimmed.map((m) => ({ role: m.role, content: m.content })),
-          {
-            role: "user",
-            content: buildConversationPrompt({
-              userMessage: text,
-              suggestionContext:
-                !isUnsafe && resolvedSuggestionContext
-                  ? {
-                      nudgeBody: resolvedSuggestionContext.nudgeBody,
-                      recipeTitle: resolvedSuggestionContext.recipeTitle,
-                      pantryItemNames: resolvedSuggestionContext.pantryItemNames,
-                    }
+      const response = await LLMService.send(
+        {
+          system: resolvedSystemPrompt,
+          messages: [
+            ...trimmed.map((m) => ({ role: m.role, content: m.content })),
+            {
+              role: "user",
+              content: buildConversationPrompt({
+                userMessage: text,
+                suggestionContext:
+                  !isUnsafe && resolvedSuggestionContext
+                    ? {
+                        nudgeBody: resolvedSuggestionContext.nudgeBody,
+                        recipeTitle: resolvedSuggestionContext.recipeTitle,
+                        pantryItemNames: resolvedSuggestionContext.pantryItemNames,
+                      }
+                    : undefined,
+                assistantContext: !isUnsafe
+                  ? resolvedSuggestionContext?.assistantContext
                   : undefined,
-              assistantContext: !isUnsafe
-                ? resolvedSuggestionContext?.assistantContext
-                : undefined,
-            }),
+              }),
+            },
+          ],
+        },
+        "user",
+        {
+          onQueued: () => {
+            showCompanion("exhausted", "Still finishing something — your message is queued and will send in a moment.");
           },
-        ],
-      });
+          onRateLimited: () => {
+            showCompanion("exhausted", "Hit the rate limit — retrying automatically. No need to resend.");
+          },
+        },
+      );
 
       // Layer 3: scan the output before displaying it
       const outputBlocked = await SafetyService.scanOutput(response.content);

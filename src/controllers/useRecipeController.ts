@@ -373,18 +373,35 @@ Apply the requested change and return the full updated recipe.`,
     const promptMode = sourceMode === "idea" ? "idea" : "paste";
 
     try {
-      const response = await LLMService.send({
-        system: buildSystemPrompt(profile),
-        messages: [
-          {
-            role: "user",
-            content: buildRecipeImportPrompt({
-              sourceMode: promptMode,
-              source: sourceText,
-            }),
+      const response = await LLMService.send(
+        {
+          system: buildSystemPrompt(profile),
+          messages: [
+            {
+              role: "user",
+              content: buildRecipeImportPrompt({
+                sourceMode: promptMode,
+                source: sourceText,
+              }),
+            },
+          ],
+        },
+        "user",
+        {
+          onQueued: () => {
+            showCompanion(
+              "exhausted",
+              "Already working on something — your recipe import is next in line. Hang tight.",
+            );
           },
-        ],
-      });
+          onRateLimited: () => {
+            showCompanion(
+              "exhausted",
+              "Hit the rate limit — retrying automatically in a moment. No need to do anything.",
+            );
+          },
+        },
+      );
 
       const draft = parseRecipeDraftFromLLM(response.content);
       log.info("Recipe import parsed", { title: draft.title });
@@ -399,9 +416,7 @@ Apply the requested change and return the full updated recipe.`,
           route: "/settings?focus=assistant",
         },
       );
-      setError(
-        "Sous Chef could not import that recipe right now.",
-      );
+      setError("Sous Chef could not import that recipe right now.");
       return null;
     }
   };
