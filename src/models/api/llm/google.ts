@@ -7,7 +7,7 @@ export const GEMINI_BASE_URL =
 // Pinned text model. Override per-environment via EXPO_PUBLIC_GEMINI_MODEL
 // (see .env). Keep this a real, accessible model name — not a moving alias —
 // so behavior is reproducible across machines.
-export const DEFAULT_MODEL = "gemini-3.5-flash";
+export const DEFAULT_MODEL = "gemini-2.0-flash";
 const SETTINGS_STORAGE_KEY = "app_settings";
 
 // Dev-only fallback. In production builds (__DEV__ === false) the env key is
