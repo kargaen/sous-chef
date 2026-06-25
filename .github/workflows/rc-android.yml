@@ -53,17 +53,20 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      - name: Read version from package.json
+      - name: Resolve RC tag from package.json
         id: version
-        run: echo "value=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: |
+          FULL=$(node -p "require('./package.json').version")
+          BASE=$(echo "$FULL" | sed 's/-rc.*//')
+          echo "tag=v${BASE}-rc" >> $GITHUB_OUTPUT
 
       - name: Create or overwrite RC release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.value }}
-          name: v${{ steps.version.outputs.value }} — ${{ steps.sha.outputs.short }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }} — ${{ steps.sha.outputs.short }}
           body: |
-            RC build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `dev`.
+            RC build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `dev`. Overwrites the previous RC — always the latest.
 
             **Install:** download `sous-chef.apk` and open it on your Android device.
             You may need to allow installation from unknown sources in your device settings.
