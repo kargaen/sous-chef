@@ -52,7 +52,7 @@ export const NudgeService = {
       const response = await LLMService.send({
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: context }],
-      });
+      }, "background");
 
       const nudge = JSON.parse(response.content) as NudgeCard;
       return nudge;

@@ -132,7 +132,7 @@ const generateSparks = async (
     const response = await LLMService.send({
       system: SPARKS_SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildSparksUserMessage(context) }],
-    });
+    }, "background");
     const sparks = parseSparks(response.content);
     return sparks.length > 0 ? sparks : fallbackSparks(produce);
   } catch {
@@ -393,7 +393,7 @@ export const InspirationService = {
             }),
           },
         ],
-      });
+      }, "background");
       const parsed = parseLeftover(response.content);
       if (parsed) {
         title = parsed.title;
@@ -454,7 +454,7 @@ export const InspirationService = {
         messages: [
           { role: "user", content: buildGenerateThemesUserMessage(context) },
         ],
-      });
+      }, "background");
       generated = parseGeneratedThemes(response.content);
     } catch {
       return [];
