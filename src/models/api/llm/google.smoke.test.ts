@@ -44,7 +44,11 @@ describeSmoke("LLM live smoke", () => {
     expect(parsed.ok).toBe(true);
   }, 30000);
 
-  it("image model returns image data", async () => {
+  // Skipped: Gemini removed image generation from the free tier, so this
+  // call always 429s with a quota limit of 0 regardless of app or key
+  // health. Re-enable once billing is on the project or the assertion has
+  // another way to distinguish "no free image quota" from a real outage.
+  it.skip("image model returns image data", async () => {
     const result = await generateImage({
       base64: ONE_PX_PNG,
       mimeType: "image/png",
