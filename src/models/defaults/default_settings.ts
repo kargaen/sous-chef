@@ -10,4 +10,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   weekStartDay: 1,
   defaultPlanLength: 7,
   pantryNudgeFrequency: "monthly",
+  geminiModel: "",
 };

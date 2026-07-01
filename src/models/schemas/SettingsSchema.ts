@@ -25,6 +25,7 @@ export const AppSettingsSchema = z.object({
     .enum(["daily", "weekly", "monthly", "rarely"])
     .optional()
     .default("monthly"),
+  geminiModel: z.string().optional().default(""),
 });
 
 export type AppSettingsInput = z.infer<typeof AppSettingsSchema>;

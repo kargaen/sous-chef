@@ -16,8 +16,22 @@ const SETTINGS_STORAGE_KEY = "app_settings";
 // do not ship a production build with a real key in EXPO_PUBLIC_GEMINI_API_KEY.
 const getEnvApiKey = () =>
   __DEV__ ? (process.env.EXPO_PUBLIC_GEMINI_API_KEY?.trim() ?? "") : "";
-const getModel = () =>
-  process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+const getModel = async (): Promise<string> => {
+  if (__DEV__) {
+    try {
+      const raw = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { geminiModel?: unknown };
+        const override =
+          typeof parsed.geminiModel === "string" ? parsed.geminiModel.trim() : "";
+        if (override) return override;
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+};
 
 const getStoredApiKey = async (): Promise<string> => {
   try {
@@ -59,7 +73,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export const googleProvider: LLMProvider = {
   send: async (request: LLMRequest): Promise<LLMResponse> => {
     const apiKey = await getApiKey();
-    const model = getModel();
+    const model = await getModel();
     const url = `${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`;
     const body = JSON.stringify(toGeminiMessages(request));
 
@@ -112,7 +126,7 @@ export const googleProvider: LLMProvider = {
     onChunk: (chunk: string) => void,
   ): Promise<void> => {
     const apiKey = await getApiKey();
-    const model = getModel();
+    const model = await getModel();
     const url = `${GEMINI_BASE_URL}/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
     const response = await fetch(url, {
       method: "POST",

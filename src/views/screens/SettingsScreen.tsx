@@ -524,6 +524,28 @@ export default function SettingsScreen() {
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Model override</Text>
+              <Text style={styles.cardCopy}>
+                Override the Gemini model for this dev session. Leave blank to
+                use the default. Has no effect in compiled builds.
+              </Text>
+            </View>
+            <View style={styles.fieldGroup}>
+              <TextField
+                label="Model name"
+                value={view.draft.geminiModel ?? ""}
+                onChangeText={(geminiModel) => {
+                  view.updateDraft({ geminiModel });
+                }}
+                placeholder={`Default: gemini-2.0-flash`}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>Diagnostic log</Text>
               <Text style={styles.cardCopy}>
                 Exports the in-memory log buffer (last 500 entries). Share it
