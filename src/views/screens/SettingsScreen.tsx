@@ -537,7 +537,7 @@ export default function SettingsScreen() {
                 onChangeText={(geminiModel) => {
                   view.updateDraft({ geminiModel });
                 }}
-                placeholder={`Default: gemini-2.0-flash`}
+                placeholder={`Default: gemini-2.5-flash`}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
