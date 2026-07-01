@@ -34,6 +34,26 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Cancel stale RC builds
+        run: |
+          # GitHub Actions' own concurrency cancellation (above) only stops the
+          # workflow run — it can't reach an EAS build already submitted to
+          # Expo's servers by an earlier run. Without this, every rapid push to
+          # dev leaves its predecessor's build queued/running on Expo, burning
+          # through the monthly build quota. Explicitly cancel any non-terminal
+          # RC build for this profile before submitting a new one.
+          for STATUS in new in-queue in-progress; do
+            IDS=$(eas build:list \
+              --platform android \
+              --build-profile preview \
+              --status "$STATUS" \
+              --non-interactive --json --limit 10 | jq -r '.[].id')
+            for ID in $IDS; do
+              echo "Canceling stale RC build ($STATUS): $ID"
+              eas build:cancel "$ID" --non-interactive || true
+            done
+          done
+
       - name: Build APK via EAS
         id: build
         run: |
