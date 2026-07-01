@@ -1,4 +1,5 @@
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as unknown as { __DEV__: boolean }).__DEV__ = true;
 
 const originalConsoleError = console.error;
 
