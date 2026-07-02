@@ -101,35 +101,35 @@ const extractJsonObject = (value: string): string | null => {
 const recipeRepository = new RecipeRepository();
 const cookLogRepository = new CookLogRepository();
 
-const parseAdaptationResponse = (
-  content: string,
-): AdaptationResponse | null => {
+interface AdaptationParseResult {
+  data: AdaptationResponse | null;
+  failureReason?: "no_json_found" | "json_parse_error" | "schema_validation_failed";
+  failureDetail?: string;
+}
+
+const parseAdaptationResponse = (content: string): AdaptationParseResult => {
   const jsonText = extractJsonObject(content);
   if (!jsonText) {
-    if (__DEV__) {
-      console.warn("[adaptation] no JSON object in response:", content);
-    }
-    return null;
+    return { data: null, failureReason: "no_json_found" };
   }
 
   try {
     const parsed: unknown = JSON.parse(jsonText);
     const validated = AdaptationResponseSchema.safeParse(parsed);
     if (!validated.success) {
-      if (__DEV__) {
-        console.warn(
-          "[adaptation] schema validation failed:",
-          JSON.stringify(validated.error.issues, null, 2),
-        );
-      }
-      return null;
+      return {
+        data: null,
+        failureReason: "schema_validation_failed",
+        failureDetail: JSON.stringify(validated.error.issues.slice(0, 5)),
+      };
     }
-    return validated.data;
+    return { data: validated.data };
   } catch (error) {
-    if (__DEV__) {
-      console.warn("[adaptation] JSON.parse failed:", error, jsonText);
-    }
-    return null;
+    return {
+      data: null,
+      failureReason: "json_parse_error",
+      failureDetail: error instanceof Error ? error.message : String(error),
+    };
   }
 };
 
@@ -188,14 +188,20 @@ export function useAdaptationController(
         ],
       });
 
-      const parsed = parseAdaptationResponse(response.content);
-      if (!parsed) {
-        log.warn("Adaptation response parse failed", { recipeId: recipe.id });
+      const parseResult = parseAdaptationResponse(response.content);
+      if (!parseResult.data) {
+        log.warn("Adaptation response parse failed", {
+          recipeId: recipe.id,
+          reason: parseResult.failureReason,
+          detail: parseResult.failureDetail,
+          responseSnippet: response.content.slice(0, 500),
+        });
         setError("The adaptation came back in an unexpected format. Try again.");
         setPhase("ready");
         return;
       }
 
+      const parsed = parseResult.data;
       log.info("Adaptation complete", { recipeId: recipe.id, hasIngredientChanges: (parsed.ingredientChanges?.length ?? 0) > 0 });
       setResult(parsed);
       if (parsed.summary) appendMessage("assistant", parsed.summary);
