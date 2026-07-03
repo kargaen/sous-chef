@@ -3,6 +3,14 @@ name: Build & Release Android RC
 on:
   push:
     branches: [dev]
+    # Docs, skills, and CI-config pushes must never consume EAS build quota.
+    # A push runs the build only if it touches at least one file NOT ignored
+    # here. Workflow changes themselves are ignored too — test them by
+    # bundling with a code change or reverting this filter deliberately.
+    paths-ignore:
+      - '.claude/**'
+      - '**.md'
+      - '.github/**'
 
 concurrency:
   group: rc-android-${{ github.ref }}
