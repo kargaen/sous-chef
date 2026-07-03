@@ -54,9 +54,9 @@ The app is layered MVC. Import direction is strictly one-way down; a violation i
 | --- | --- | --- |
 | View | `src/views/` | Screens, components, `.styles.ts`, `.hooks.ts` |
 | Controller | `src/controllers/` | `useXxxController` hooks |
-| Store | `src/store/` | Zustand stores (14). Written by controllers, read by views |
-| Service / Infrastructure | `src/services/` | `LLMService`, `StorageService`, etc. |
-| Repository | `src/repositories/` | Data access over `StorageService` |
+| Store | `src/store/` | Zustand stores (13). Written by controllers, read by views |
+| Service / Infrastructure | `src/services/` | `LLMService`, `StorageService`, etc. (15) |
+| Repository | `src/models/repositories/` | Data access over `StorageService` (13) |
 | Model | `src/models/` | `types/`, `schemas/`, `api/` (providers live in `src/models/api/llm/`) |
 | Prompts | `src/prompts/` | 22 pure builder functions `(context) => string` |
 | Navigation / Composition | `app/` | expo-router v6 routes; one-line re-exports of `src/views/screens/*` |
@@ -330,8 +330,9 @@ Notes on specific sections:
 - **Findings for later**: record useful discoveries unrelated to the requested change;
   never act on them unprompted.
 - **Test suggestion**: only when concrete (what/benefit/current gap), and only because
-  this repo has a Jest suite (12 test files; large gaps: all 14 stores, all utils,
-  14/16 services, 18/20 controllers, 13/15 repos untested — plenty of candidates).
+  this repo has a Jest suite (12 test files; large gaps: all 13 stores, all utils,
+  13/15 services, 18 controller hooks mostly untested, 11/13 repos untested — plenty of
+  candidates). See sous-chef-architecture-contract for the inventory of record.
 - **Suggestions for improvement**: after a clean completion, at most 1–3 short bullets,
   within the same layer.
 - If the user missed a still-necessary instruction from a previous message, reiterate

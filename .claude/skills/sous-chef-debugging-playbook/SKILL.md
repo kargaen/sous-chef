@@ -57,7 +57,7 @@ Sibling skills: probe scripts and tooling detail live in
 | 4 | LLM call hangs forever / spinner never resolves | Pre-`e04e5b7` builds hung ~9 min on `response.json()`. Now capped at 45 s | If a hang exceeds ~45 s + retries (~2 min worst case), the bug is ABOVE the provider (queue or controller) | `e04e5b7` |
 | 5 | Works in `expo start`, broken in the APK | One of the four `__DEV__`-gated behaviors | Walk the `__DEV__` trap table below, in order | `fe95299` (related) |
 | 6 | "The adaptation came back in an unexpected format" | LLM returned non-JSON / truncated / schema-invalid JSON | Export the diagnostic log; read `reason` + `detail` + `responseSnippet` from the `Adaptation response parse failed` warn entry | `4c8f7e0` (open bug — see row 6) |
-| 7 | Jest fails with `__DEV__ is not defined` (or google.ts tests behave impossibly) | `__DEV__` is a Metro global; jest has no Metro | It is defined in `jest.setup.ts` line 2 — check that setup file is loaded (`jest.config.js` `setupFilesAfterEach`/`setupFiles`) | `fe95299` |
+| 7 | Jest fails with `__DEV__ is not defined` (or google.ts tests behave impossibly) | `__DEV__` is a Metro global; jest has no Metro | It is defined in `jest.setup.ts` line 2 — check that setup file is loaded (`jest.config.js` `setupFilesAfterEnv`) | `fe95299` |
 | 8 | EAS build fails immediately (within ~3 min) | EITHER monthly EAS quota exhausted OR a bundling error | Read the workflow's "=== EAS error output ===" step log; quota errors mention plan limits, bundling errors show Metro output | `86bc925`, `db46ed0` |
 | 9 | Metro bundling error in EAS but `expo start` is fine locally | Fast Refresh masked a syntax error, or stale local cache | Reproduce locally with a cold production-style bundle before touching CI | `86bc925` |
 

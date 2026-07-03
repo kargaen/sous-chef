@@ -144,8 +144,16 @@ Both live in `.github/workflows/`. Both build the same EAS `preview` profile
 
 ### 5a. `rc-android.yml` — the live one
 
-**Trigger: every push to `dev`.** No paths filter, no opt-out — a README typo
-push builds an APK. This is why the consent rule (section 7) exists.
+**Trigger: push to `dev` that touches at least one non-exempt file.** The
+workflow has a `paths-ignore` filter (verified, lines 10–13) exempting
+`.claude/**`, `**.md`, and `.github/**` — so a docs-only (`.md`), skills-only,
+or CI-config-only push does **not** build. Workflow-file changes are themselves
+ignored, so test a workflow edit by bundling it with a code change. Any push
+that touches even one file outside those globs (i.e. real `src/` code) fires an
+EAS build — this is why the consent rule (section 7) exists. Treat every
+code-touching push to `dev` as requiring explicit owner confirmation first;
+docs/skills-only pushes are exempt from the build but still follow normal
+change discipline.
 
 Step-by-step:
 
@@ -304,7 +312,7 @@ before quoting them:
 | --- | --- |
 | `package.json` version (`1.0.1-rc.5`) and broken `reset-project` script | `node -p "require('./package.json').version + ' ' + require('./package.json').scripts['reset-project']"` then `ls scripts/` |
 | `app.json` version (`1.0.0`) | `node -p "require('./app.json').expo.version"` |
-| RC workflow trigger, cancel-stale step, tag logic | `cat .github/workflows/rc-android.yml` |
+| RC workflow trigger, `paths-ignore` exemptions (`.claude/**`, `**.md`, `.github/**`), cancel-stale step, tag logic | `grep -n -A4 paths-ignore .github/workflows/rc-android.yml` && `cat .github/workflows/rc-android.yml` |
 | Release workflow trigger and dormancy | `cat .github/workflows/release-android.yml` && `git rev-list --count master..dev` (74 at writing) |
 | CI Node version (20) | `grep -A2 setup-node .github/workflows/*.yml` |
 | EAS profiles (`preview` = APK, `production` = app-bundle) | `cat eas.json` |
