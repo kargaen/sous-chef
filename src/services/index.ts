@@ -11,4 +11,5 @@ export { RatingDimensionsService, FIXED_RATING_DIMENSIONS } from "./RatingDimens
 export type { RatingDimension } from "./RatingDimensionsService";
 export { SeasonalService } from "./SeasonalService";
 export { StorageService } from "./StorageService";
+export { SupabaseService } from "./SupabaseService";
 export { WasteService } from "./WasteService";
