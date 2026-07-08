@@ -10,6 +10,13 @@ export class BudgetRepository {
     return row ? JSON.parse(row.data) : null;
   }
 
+  async listAll(): Promise<BudgetPeriod[]> {
+    const rows = StorageService.dbQuery<{ data: string }>(
+      "SELECT data FROM budget_periods",
+    );
+    return rows.map((row) => JSON.parse(row.data) as BudgetPeriod);
+  }
+
   async savePeriod(period: BudgetPeriod): Promise<void> {
     StorageService.dbRun(
       "INSERT OR REPLACE INTO budget_periods (id, data) VALUES (?, ?)",
