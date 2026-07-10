@@ -38,4 +38,15 @@ export class BudgetRepository {
       [entry.id, entry.periodId, entry.recordedAt, JSON.stringify(entry)],
     );
   }
+
+  // Snapshot restore only — insertEntry() stays a plain INSERT so a real id
+  // collision during normal spend-logging still fails loudly. Restore needs
+  // to be re-runnable (and to land onto a device that may already have the
+  // same entry from before a wipe), so it upserts instead.
+  async restoreEntry(entry: SpendEntry): Promise<void> {
+    StorageService.dbRun(
+      "INSERT OR REPLACE INTO spend_entries (id, period_id, recorded_at, data) VALUES (?, ?, ?, ?)",
+      [entry.id, entry.periodId, entry.recordedAt, JSON.stringify(entry)],
+    );
+  }
 }
