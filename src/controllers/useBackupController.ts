@@ -21,9 +21,23 @@ export const useBackupController = () => {
     }
   };
 
+  const restoreNow = async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      await BackupService.restoreFromRemote();
+    } catch {
+      setError("Could not restore right now.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     lastBackupAt,
     backupNow,
+    restoreNow,
     loading,
     error,
   };
