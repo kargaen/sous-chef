@@ -426,6 +426,64 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.sectionBlock}>
+        <Text style={styles.sectionEyebrow}>Account</Text>
+        <Text style={styles.sectionTitle}>Backup &amp; restore</Text>
+        <Text style={styles.sectionCopy}>
+          Keep your pantry, recipes, and plans recoverable if this device is
+          lost or wiped.
+        </Text>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>
+              {view.authStatus === "authenticated"
+                ? "Signed in"
+                : "Not signed in"}
+            </Text>
+            <Text style={styles.cardCopy}>
+              {view.authStatus === "authenticated"
+                ? (view.authUser?.email ?? "Account connected.")
+                : "Sign in to enable backups."}
+            </Text>
+          </View>
+
+          <View style={styles.actionColumn}>
+            {view.authStatus === "authenticated" ? (
+              <>
+                <Button
+                  label="Back up now"
+                  variant="secondary"
+                  onPress={() => {
+                    void view.handleBackupNow();
+                  }}
+                  loading={view.backupLoading}
+                />
+                <Text style={styles.helperText}>
+                  {view.lastBackupAt
+                    ? `Last backup: ${new Date(view.lastBackupAt).toLocaleString()}`
+                    : "No backup yet."}
+                </Text>
+              </>
+            ) : (
+              <Button
+                label="Sign in"
+                variant="secondary"
+                onPress={view.handleOpenAuth}
+                loading={view.authLoading}
+              />
+            )}
+
+            {view.backupError ? (
+              <Text style={textStyles.errorText}>{view.backupError}</Text>
+            ) : null}
+            {view.authError ? (
+              <Text style={textStyles.errorText}>{view.authError}</Text>
+            ) : null}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.sectionBlock}>
         <Text style={styles.sectionEyebrow}>Support</Text>
         <Text style={styles.sectionTitle}>Keep the app understandable</Text>
         <Text style={styles.sectionCopy}>
