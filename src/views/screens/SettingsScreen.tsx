@@ -463,6 +463,12 @@ export default function SettingsScreen() {
                     ? `Last backup: ${new Date(view.lastBackupAt).toLocaleString()}`
                     : "No backup yet."}
                 </Text>
+                <Button
+                  label="Restore from backup"
+                  variant="ghost"
+                  onPress={view.handleRestoreNow}
+                  loading={view.backupLoading}
+                />
               </>
             ) : (
               <Button

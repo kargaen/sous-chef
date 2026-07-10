@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert } from "react-native";
 import type { LayoutChangeEvent, ScrollView } from "react-native";
 
 import {
@@ -164,6 +165,7 @@ export const useSettingsScreenView = () => {
   const {
     lastBackupAt,
     backupNow,
+    restoreNow,
     loading: backupLoading,
     error: backupError,
   } = useBackupController();
@@ -327,6 +329,23 @@ export const useSettingsScreenView = () => {
     await backupNow();
   };
 
+  const handleRestoreNow = () => {
+    Alert.alert(
+      "Restore from backup?",
+      "This overwrites any local data that matches your last backup. Anything you've changed on this device since then won't be affected.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Restore",
+          style: "destructive",
+          onPress: () => {
+            void restoreNow();
+          },
+        },
+      ],
+    );
+  };
+
   const handleSectionLayout =
     (sectionId: string) => (event: LayoutChangeEvent) => {
       const { y } = event.nativeEvent.layout;
@@ -352,6 +371,7 @@ export const useSettingsScreenView = () => {
       backupError,
       handleOpenAuth,
       handleBackupNow,
+      handleRestoreNow,
       handleOpenIntroWizard,
       handleReset,
       handleSave,
@@ -391,6 +411,7 @@ export const useSettingsScreenView = () => {
       backupError,
       handleOpenAuth,
       handleBackupNow,
+      handleRestoreNow,
       handleOpenIntroWizard,
       handleReset,
       handleSave,
