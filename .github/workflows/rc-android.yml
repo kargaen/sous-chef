@@ -12,14 +12,34 @@ on:
       - '**.md'
       - '.github/**'
 
-concurrency:
-  group: rc-android-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
+  migrate-db:
+    name: Apply Database Migrations
+    runs-on: ubuntu-latest
+    # Deliberately outside the cancellable concurrency group below:
+    # a newer push may cancel a stale build, but migrations always finish.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply Supabase migrations
+        run: |
+          npx supabase@latest link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+          npx supabase@latest db push --linked --yes --include-all
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
   build:
     name: Android APK (EAS RC)
+    # Schema first, app second: the APK must never ship against a database
+    # missing the migrations it assumes.
+    needs: migrate-db
     runs-on: ubuntu-latest
+    # Job-level (not workflow-level) so a newer dev push cancels a stale RC
+    # build without ever cancelling a half-applied migration run.
+    concurrency:
+      group: rc-android-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: write
 
