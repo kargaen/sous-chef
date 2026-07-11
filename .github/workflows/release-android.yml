@@ -4,17 +4,35 @@ on:
   push:
     branches: [master]
 
-# Cancel any in-flight build when a newer commit arrives on master.
-# Note: the EAS cloud build itself is not cancelled — only the GH Actions
-# runner is. EAS credits are consumed either way; keep pushes intentional.
-concurrency:
-  group: release-android
-  cancel-in-progress: true
-
 jobs:
+  migrate-db:
+    name: Apply Database Migrations
+    runs-on: ubuntu-latest
+    # Deliberately outside the cancellable concurrency group below:
+    # a newer push may cancel a stale build, but migrations always finish.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply Supabase migrations
+        run: |
+          npx supabase@latest link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+          npx supabase@latest db push --linked --yes --include-all
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
   build:
     name: Android APK (EAS preview)
+    # Schema first, app second: the APK must never ship against a database
+    # missing the migrations it assumes.
+    needs: migrate-db
     runs-on: ubuntu-latest
+    # Cancel any in-flight build when a newer commit arrives on master.
+    # Note: the EAS cloud build itself is not cancelled — only the GH Actions
+    # runner is. EAS credits are consumed either way; keep pushes intentional.
+    concurrency:
+      group: release-android
+      cancel-in-progress: true
     permissions:
       contents: write
 
