@@ -11,7 +11,7 @@ const DISMISSAL_STORAGE_KEY = "discover_dismissal_signals";
 // Keep the memory small so it can only ever be a gentle bias on generation.
 const MAX_SIGNALS = 24;
 
-interface DismissalSignal {
+export interface DismissalSignal {
   title: string;
   at: string;
 }
@@ -60,6 +60,13 @@ export class DismissalRepository {
     return parseSignals(raw)
       .slice(0, Math.max(0, limit))
       .map((signal) => signal.title);
+  }
+
+  // Full signal objects (title + timestamp) for snapshot export/restore —
+  // getRecentTitles() alone loses the original dismissal time.
+  async getRecentSignals(limit: number = MAX_SIGNALS): Promise<DismissalSignal[]> {
+    const raw = await StorageService.storageGetItem(DISMISSAL_STORAGE_KEY);
+    return parseSignals(raw).slice(0, Math.max(0, limit));
   }
 
   // Forget everything — used when the cook turns learning off.

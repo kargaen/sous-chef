@@ -39,7 +39,7 @@ Sous Chef uses a strict three-layer MVC split, adapted to the idioms of React Na
 | Language    | TypeScript (strict)                 | `strict: true` in tsconfig; no `any` in `models/` or `controllers/`            |
 | State       | Zustand                             | Lightweight slices; persisted with `zustand/middleware/persist` + AsyncStorage |
 | Local DB    | Expo SQLite                         | Pantry, meal plans, budget, and cook history stored offline-first              |
-| Remote sync | Supabase (optional)                 | User accounts, cross-device sync; app is fully functional without it           |
+| Remote sync | Supabase (optional)                 | Durable recovery + cross-device sync; app is fully functional without it. `SupabaseService` is the sole `@supabase/supabase-js` import point (auth + snapshot blob upload/fetch); backup/restore ships before incremental sync |
 | LLM         | Google Gemini API                   | Prompt assembly in `src/prompts/`; streaming via `LLMService`                  |
 | Validation  | Zod                                 | Schemas in `src/models/schemas/`; single source of truth for data shapes       |
 | Testing     | Jest + React Native Testing Library | Unit tests mirror the MVC split                                                |
@@ -265,8 +265,13 @@ sous-chef/
 │   │   ├── PricingService.ts                   # Estimates recipe cost from ingredient quantities + regional prices
 │   │   │                                       # Cached; refreshed weekly
 │   │   │
-│   │   └── StorageService.ts                   # Unified wrapper over SQLite (Expo SQLite) and AsyncStorage
-│   │                                           # Handles migrations, serialisation, and error normalisation
+│   │   ├── StorageService.ts                   # Unified wrapper over SQLite (Expo SQLite) and AsyncStorage
+│   │   │                                       # Handles migrations, serialisation, and error normalisation
+│   │   │
+│   │   └── SupabaseService.ts                  # Sole @supabase/supabase-js import point (mirrors StorageService's role)
+│   │                                           # Auth (sign up/in/out, session, auth-state changes) + snapshot blob
+│   │                                           # upload/fetch; lazy client construction so a missing config only
+│   │                                           # fails the calling operation, never app boot
 │   │
 │   │
 │   ├── prompts/                                # LLM prompt templates — versioned business logic
@@ -386,6 +391,21 @@ This keeps the naming boundary explicit:
 
 - `RecipesScreen` = stored recipes tab home
 - `RecipeScreen` = single recipe detail surface
+
+---
+
+## Upcoming Remote Durability Layer
+
+Supabase is being phased in as a durable remote store sitting *behind* the existing offline-first SQLite cache — not a replacement for it. Local SQLite stays primary for reads; Supabase (Postgres + Supabase Auth) exists so a lost, wiped, or replaced device can recover data via email/password sign-in.
+
+- **Service**: `SupabaseService.ts` (built) is the sole `@supabase/supabase-js` import point — auth methods plus raw snapshot blob upload/fetch.
+- **Service**: `SnapshotService.ts` (planned) assembles/restores a versioned JSON snapshot by calling existing repository read/save methods; strips `geminiApiKey` before upload.
+- **Service**: `BackupService.ts` (planned) ties session + snapshot + `SupabaseService` together (`backupNow()`, `restoreFromRemote()`).
+- **Store**: `authStore.ts` (planned) holds `{ session, user, status, lastBackupAt }`, written only by the auth controller.
+- **Controller**: `useAuthController.ts` and `useBackupController.ts` (planned) are the only callers into the services above.
+- **View**: `AuthScreen.tsx` (+ `app/auth.tsx` route, planned) for email/password sign-in, and a "Backup & Restore" section added to the existing `SettingsScreen`.
+
+Phase 2 (background incremental sync — UUID ids, `updated_at`/soft-delete metadata, a `sync_queue` table, and a `SyncService`) follows once backup/restore ships, per the Offline-First Principle below: sync is background-only and never blocks the UI.
 
 ---
 

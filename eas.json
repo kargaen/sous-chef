@@ -6,6 +6,10 @@
     "preview": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wfjwjkjrbgluiupskuau.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_VK5vEWHI6pi4cmTfviahmQ_S8K-oSz1"
       }
     },
     "production": {
@@ -14,6 +18,10 @@
       },
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wfjwjkjrbgluiupskuau.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_VK5vEWHI6pi4cmTfviahmQ_S8K-oSz1"
       }
     }
   },
