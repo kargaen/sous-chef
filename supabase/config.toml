@@ -1,0 +1,5 @@
+# Minimal Supabase CLI project marker. `supabase link` in the release
+# workflow's migrate-db job needs an initialized supabase/ directory; the
+# linked project ref comes from the workflow's --project-ref flag, not from
+# this file. Local defaults apply for everything unset.
+project_id = "sous-chef"
