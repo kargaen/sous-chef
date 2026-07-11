@@ -10,3 +10,4 @@ export * from "./Recipe.types";
 export * from "./Seasonal.types";
 export * from "./Settings.types";
 export * from "./ShoppingList.types";
+export * from "./Snapshot.types";

@@ -1,8 +1,14 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert } from "react-native";
 import type { LayoutChangeEvent, ScrollView } from "react-native";
 
-import { useChefController, useSettingsController } from "@/controllers";
+import {
+  useAuthController,
+  useBackupController,
+  useChefController,
+  useSettingsController,
+} from "@/controllers";
 import type {
   AppSettings,
   ChefProfile,
@@ -150,6 +156,19 @@ export const useSettingsScreenView = () => {
     loading: profileLoading,
     error: profileError,
   } = useChefController();
+  const {
+    status: authStatus,
+    user: authUser,
+    loading: authLoading,
+    error: authError,
+  } = useAuthController();
+  const {
+    lastBackupAt,
+    backupNow,
+    restoreNow,
+    loading: backupLoading,
+    error: backupError,
+  } = useBackupController();
   const [draft, setDraft] = useState<AppSettings>(emptySettings);
   const [profileDraft, setProfileDraft] =
     useState<ChefProfileDraft>(emptyChefProfileDraft);
@@ -302,6 +321,31 @@ export const useSettingsScreenView = () => {
     router.push("/welcome");
   };
 
+  const handleOpenAuth = () => {
+    router.push("/auth");
+  };
+
+  const handleBackupNow = async () => {
+    await backupNow();
+  };
+
+  const handleRestoreNow = () => {
+    Alert.alert(
+      "Restore from backup?",
+      "This overwrites any local data that matches your last backup. Anything you've changed on this device since then won't be affected.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Restore",
+          style: "destructive",
+          onPress: () => {
+            void restoreNow();
+          },
+        },
+      ],
+    );
+  };
+
   const handleSectionLayout =
     (sectionId: string) => (event: LayoutChangeEvent) => {
       const { y } = event.nativeEvent.layout;
@@ -318,6 +362,16 @@ export const useSettingsScreenView = () => {
       dietOptions: DIET_OPTIONS,
       languageOptions: LANGUAGE_OPTIONS,
       error: validationError ?? error ?? profileError,
+      authStatus,
+      authUser,
+      authLoading,
+      authError,
+      lastBackupAt,
+      backupLoading,
+      backupError,
+      handleOpenAuth,
+      handleBackupNow,
+      handleRestoreNow,
       handleOpenIntroWizard,
       handleReset,
       handleSave,
@@ -348,6 +402,16 @@ export const useSettingsScreenView = () => {
     [
       draft,
       error,
+      authStatus,
+      authUser,
+      authLoading,
+      authError,
+      lastBackupAt,
+      backupLoading,
+      backupError,
+      handleOpenAuth,
+      handleBackupNow,
+      handleRestoreNow,
       handleOpenIntroWizard,
       handleReset,
       handleSave,

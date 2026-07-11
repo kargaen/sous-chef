@@ -10,6 +10,13 @@ export class BudgetRepository {
     return row ? JSON.parse(row.data) : null;
   }
 
+  async listAll(): Promise<BudgetPeriod[]> {
+    const rows = StorageService.dbQuery<{ data: string }>(
+      "SELECT data FROM budget_periods",
+    );
+    return rows.map((row) => JSON.parse(row.data) as BudgetPeriod);
+  }
+
   async savePeriod(period: BudgetPeriod): Promise<void> {
     StorageService.dbRun(
       "INSERT OR REPLACE INTO budget_periods (id, data) VALUES (?, ?)",
@@ -28,6 +35,17 @@ export class BudgetRepository {
   async insertEntry(entry: SpendEntry): Promise<void> {
     StorageService.dbRun(
       "INSERT INTO spend_entries (id, period_id, recorded_at, data) VALUES (?, ?, ?, ?)",
+      [entry.id, entry.periodId, entry.recordedAt, JSON.stringify(entry)],
+    );
+  }
+
+  // Snapshot restore only — insertEntry() stays a plain INSERT so a real id
+  // collision during normal spend-logging still fails loudly. Restore needs
+  // to be re-runnable (and to land onto a device that may already have the
+  // same entry from before a wipe), so it upserts instead.
+  async restoreEntry(entry: SpendEntry): Promise<void> {
+    StorageService.dbRun(
+      "INSERT OR REPLACE INTO spend_entries (id, period_id, recorded_at, data) VALUES (?, ?, ?, ?)",
       [entry.id, entry.periodId, entry.recordedAt, JSON.stringify(entry)],
     );
   }

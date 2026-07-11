@@ -162,6 +162,38 @@ export class CookLogRepository {
     });
   }
 
+  // Id-preserving writes for snapshot restore only. Unlike recordCook() and
+  // saveRatingCategories() — which mint fresh ids for real cook-logging flows
+  // — restore must keep the snapshot's original ids so Rating rows still
+  // point at the correct cook log and category after a round-trip.
+  restoreCookLog(entry: CookLogEntry): void {
+    StorageService.dbRun(
+      "INSERT OR REPLACE INTO cook_logs (id, recipe_id, cooked_at, overall_score) VALUES (?, ?, ?, ?)",
+      [entry.id, entry.recipeId, entry.cookedAt, entry.overallScore ?? null],
+    );
+  }
+
+  restoreRating(rating: Rating): void {
+    StorageService.dbRun(
+      "INSERT OR REPLACE INTO ratings (id, cook_log_id, category_id, score) VALUES (?, ?, ?, ?)",
+      [rating.id, rating.cookLogId, rating.categoryId, rating.score],
+    );
+  }
+
+  restoreCookNote(note: CookNote): void {
+    StorageService.dbRun(
+      "INSERT OR REPLACE INTO cook_notes (id, recipe_id, body, created_at) VALUES (?, ?, ?, ?)",
+      [note.id, note.recipeId, note.body, note.createdAt],
+    );
+  }
+
+  restoreRatingCategory(category: RatingCategory): void {
+    StorageService.dbRun(
+      "INSERT OR REPLACE INTO rating_categories (id, recipe_id, label, display_order) VALUES (?, ?, ?, ?)",
+      [category.id, category.recipeId, category.label, category.displayOrder],
+    );
+  }
+
   // Derived stats — always computed from the underlying rows so they never drift.
   getStats(recipeId: string): RecipeCookStats {
     const aggregate = StorageService.dbQueryFirst<{
