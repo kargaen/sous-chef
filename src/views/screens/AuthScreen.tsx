@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { spacing } from "@/constants";
+import { colors, radius, spacing, typography } from "@/constants";
 import { useAuthController } from "@/controllers/useAuthController";
 import { Button, TextField } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
@@ -33,7 +33,7 @@ export default function AuthScreen() {
           { paddingTop: insets.top + spacing.xl },
         ]}
       >
-        <Text style={textStyles.screenTitleCompact}>You're signed in</Text>
+        <Text style={textStyles.screenTitleCompact}>You&apos;re signed in</Text>
         <Text style={textStyles.emptyText}>
           {ctrl.user?.email ?? "Account connected."}
         </Text>
@@ -73,6 +73,15 @@ export default function AuthScreen() {
       </View>
 
       {ctrl.error ? <Text style={textStyles.errorText}>{ctrl.error}</Text> : null}
+
+      {ctrl.pendingConfirmation ? (
+        <View style={styles.noticeCard}>
+          <Text style={styles.noticeText}>
+            Account created — check your inbox to confirm your email, then
+            sign in here.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.fieldGroup}>
         <TextField
@@ -130,6 +139,20 @@ const styles = StyleSheet.create({
 
   fieldGroup: {
     gap: spacing.md,
+  },
+
+  noticeCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    backgroundColor: colors.background.card,
+  },
+
+  noticeText: {
+    fontSize: typography.size.sm,
+    lineHeight: typography.lineHeight.sm,
+    color: colors.text.secondary,
   },
 
   actionColumn: {
