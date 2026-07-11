@@ -2,8 +2,9 @@
 -- "Upcoming Remote Durability Layer"). Matches SupabaseService's access
 -- pattern exactly: upsert on user_id, select data by user_id.
 --
--- Apply via Supabase MCP apply_migration, or paste into the dashboard's
--- SQL editor (project wfjwjkjrbgluiupskuau). Idempotent.
+-- Applied automatically by the release workflow's migrate-db job
+-- (supabase db push); can also be pasted into the dashboard's SQL editor
+-- (project wfjwjkjrbgluiupskuau). Idempotent.
 
 create table if not exists public.user_snapshots (
   user_id uuid primary key references auth.users (id) on delete cascade,
