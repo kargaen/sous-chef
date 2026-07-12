@@ -2,7 +2,7 @@ export { getDefaultAssistantGreeting } from "./getAssistantGreeting";
 export { buildHomeBriefing } from "./buildHomeBriefing";
 export type { HomeBriefingContext } from "./buildHomeBriefing";
 export { useAdaptationController } from "./useAdaptationController";
-export { useAuthController } from "./useAuthController";
+export { useAuthController, RESEND_GRACE_MS } from "./useAuthController";
 export { useBackupController } from "./useBackupController";
 export type {
   AdaptationChatMessage,

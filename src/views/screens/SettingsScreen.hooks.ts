@@ -4,6 +4,7 @@ import { Alert } from "react-native";
 import type { LayoutChangeEvent, ScrollView } from "react-native";
 
 import {
+  RESEND_GRACE_MS,
   useAuthController,
   useBackupController,
   useChefController,
@@ -159,9 +160,36 @@ export const useSettingsScreenView = () => {
   const {
     status: authStatus,
     user: authUser,
+    pendingSignup,
+    resendConfirmation,
     loading: authLoading,
     error: authError,
   } = useAuthController();
+  // Ticks while a confirmation is pending so the resend affordance re-enables
+  // when the grace period lapses without any user interaction.
+  const [resendNow, setResendNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!pendingSignup) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setResendNow(Date.now());
+    }, 30_000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [pendingSignup]);
+
+  const canResendConfirmation =
+    pendingSignup !== null &&
+    resendNow - new Date(pendingSignup.lastSentAt).getTime() >= RESEND_GRACE_MS;
+
+  const handleResendConfirmation = async () => {
+    await resendConfirmation();
+  };
   const {
     lastBackupAt,
     backupNow,
@@ -366,6 +394,9 @@ export const useSettingsScreenView = () => {
       authUser,
       authLoading,
       authError,
+      pendingSignup,
+      canResendConfirmation,
+      handleResendConfirmation,
       lastBackupAt,
       backupLoading,
       backupError,
@@ -406,6 +437,9 @@ export const useSettingsScreenView = () => {
       authUser,
       authLoading,
       authError,
+      pendingSignup,
+      canResendConfirmation,
+      handleResendConfirmation,
       lastBackupAt,
       backupLoading,
       backupError,

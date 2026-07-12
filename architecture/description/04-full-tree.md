@@ -7,6 +7,7 @@ sous-chef/
 │   ├── (onboarding)/                           # Route group: invisible to navigation path
 │   │   ├── _layout.tsx                         # Onboarding shell layout
 │   │   ├── welcome.tsx                         # Brand intro + value proposition
+│   │   ├── sign-up.tsx                         # Backup account sign-up (re-exports AuthScreen); wizard wiring is EPIC-007
 │   │   ├── taste-profile.tsx                   # Capture dietary needs, dislikes, skill level
 │   │   └── kitchen-setup.tsx                   # Equipment inventory, fridge/pantry baseline
 │   │
@@ -72,7 +73,8 @@ sous-chef/
 │   │       ├── BudgetRepository.ts             # SQLite spend_entries; period aggregation
 │   │       ├── ShoppingListRepository.ts       # Derived from meal plan + pantry diff
 │   │       ├── SeasonalRepository.ts           # Remote fetch + local cache by region/month
-│   │       └── ChefProfileRepository.ts        # AsyncStorage profile; habit snapshot writes
+│   │       ├── ChefProfileRepository.ts        # AsyncStorage profile; habit snapshot writes
+│   │       └── PendingSignupRepository.ts      # AsyncStorage {email, lastSentAt}; pending email-confirmation survives restarts
 │   │
 │   │
 │   ├── controllers/                            # [CONTROLLER] Business logic as custom hooks

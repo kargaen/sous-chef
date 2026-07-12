@@ -438,12 +438,16 @@ export default function SettingsScreen() {
             <Text style={styles.cardTitle}>
               {view.authStatus === "authenticated"
                 ? "Signed in"
-                : "Not signed in"}
+                : view.pendingSignup
+                  ? "Confirmation pending"
+                  : "Not signed in"}
             </Text>
             <Text style={styles.cardCopy}>
               {view.authStatus === "authenticated"
                 ? (view.authUser?.email ?? "Account connected.")
-                : "Sign in to enable backups."}
+                : view.pendingSignup
+                  ? `Confirm the mail sent to ${view.pendingSignup.email}, then sign in.`
+                  : "Sign in to enable backups."}
             </Text>
           </View>
 
@@ -468,6 +472,29 @@ export default function SettingsScreen() {
                   variant="ghost"
                   onPress={view.handleRestoreNow}
                   loading={view.backupLoading}
+                />
+              </>
+            ) : view.pendingSignup ? (
+              <>
+                <Button
+                  label="Resend confirmation mail"
+                  variant="ghost"
+                  onPress={() => {
+                    void view.handleResendConfirmation();
+                  }}
+                  disabled={!view.canResendConfirmation}
+                  loading={view.authLoading}
+                />
+                {!view.canResendConfirmation ? (
+                  <Text style={styles.helperText}>
+                    A mail was sent recently — resend unlocks in a few minutes.
+                  </Text>
+                ) : null}
+                <Button
+                  label="Sign in"
+                  variant="secondary"
+                  onPress={view.handleOpenAuth}
+                  loading={view.authLoading}
                 />
               </>
             ) : (
