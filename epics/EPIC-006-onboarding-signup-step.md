@@ -81,7 +81,7 @@ Deliberately not tested: the Supabase resend network call itself (mocked at the
 [x] 4. AuthScreen: pending card shows the email + "Resend confirmation mail" (disabled within grace) — done when tsc + eslint pass
 [x] 5. Settings Account section: pending-confirmation state (email + resend) replaces the sign-up CTA in SettingsScreen.hooks.ts — done when tsc + eslint pass
 [x] 6. Settings Account section view wiring in SettingsScreen.tsx — done when tsc + eslint pass
-[ ] 7. New onboarding route app/(onboarding)/sign-up.tsx reusing AuthScreen with a skip affordance, ordered first after welcome — done when tsc + eslint pass
+[~] 7. New onboarding route app/(onboarding)/sign-up.tsx reusing AuthScreen — SPLIT: the route ships (re-exports AuthScreen, tsc clean); the "ordered first after welcome + skip continues the flow" wiring moved to EPIC-007, because the wizard has no working step-to-step navigation to insert into (verified: placeholder stubs, index redirects straight to tabs)
 ```
 
 ---
