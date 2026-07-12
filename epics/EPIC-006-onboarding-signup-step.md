@@ -75,7 +75,7 @@ Deliberately not tested: the Supabase resend network call itself (mocked at the
 ## 4. Checklist
 
 ```md
-[ ] 1. Add PendingSignupRepository ({email, lastSentAt} on AsyncStorage via StorageService) with failing test first in src/models/repositories/PendingSignupRepository.test.ts — done when the round-trip test passes
+[x] 1. Add PendingSignupRepository ({email, lastSentAt} on AsyncStorage via StorageService) with failing test first in src/models/repositories/PendingSignupRepository.test.ts — done when the round-trip test passes
 [ ] 2. Add SupabaseService.resendSignUpConfirmation(email) in src/services/SupabaseService.ts — done when tsc + eslint pass (network seam, covered via mocks in item 3)
 [ ] 3. Extend useAuthController: hydrate pending on mount, persist on null-session signUp, clear on signed-in, resendConfirmation() gated by RESEND_GRACE_MS — done when its new test passes
 [ ] 4. AuthScreen: pending card shows the email + "Resend confirmation mail" (disabled within grace) — done when tsc + eslint pass
