@@ -1,6 +1,6 @@
 # EPIC-006: Sign-up Step in the Intro Wizard
 
-**Status:** active
+**Status:** closed
 **Created:** 2026-07-12
 **Updated:** 2026-07-12 — owner answered Q1 and expanded scope (persisted pending-confirmation state + resend with grace period)
 **Architecture baseline:** a8275d0 (dev)
