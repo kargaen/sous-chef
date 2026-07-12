@@ -300,8 +300,7 @@ sous-chef/
 │   ├── config.toml                             # Minimal marker so `supabase link` works in CI
 │   └── migrations/                             # Applied by the workflows' migrate-db job before any build
 ├── eas.json                                    # EAS Build profiles — development, preview, production; carries EXPO_PUBLIC_SUPABASE_* for compiled builds
-├── package.json
-└── README.md
+└── package.json
 ```
 
 ---

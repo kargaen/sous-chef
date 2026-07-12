@@ -38,3 +38,4 @@ Every Description amendment appends a row to `architecture/10-change-history.md`
 | 8 | `architecture/constitution/08-testing-philosophy.md` | What each MVC layer tests and where the mock boundaries sit |
 | 9 | `architecture/constitution/09-offline-first-principle.md` | The offline-first rules; local SQLite stays primary, sync never blocks the UI |
 | 10 | `architecture/10-change-history.md` | Append-only log of Description amendments |
+| 11 | `architecture/constitution/11-product-development-alignment.md` | How the owner works: short feedback loops, layer-by-layer, MVP-first, smaller slice when uncertain |
