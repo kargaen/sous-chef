@@ -79,7 +79,7 @@ Deliberately not tested: the Supabase resend network call itself (mocked at the
 [x] 2. Add SupabaseService.resendSignUpConfirmation(email) in src/services/SupabaseService.ts — done when tsc + eslint pass (network seam, covered via mocks in item 3)
 [x] 3. Extend useAuthController: hydrate pending on mount, persist on null-session signUp, clear on signed-in, resendConfirmation() gated by RESEND_GRACE_MS — done when its new test passes
 [x] 4. AuthScreen: pending card shows the email + "Resend confirmation mail" (disabled within grace) — done when tsc + eslint pass
-[ ] 5. Settings Account section: pending-confirmation state (email + resend) replaces the sign-up CTA in SettingsScreen.hooks.ts — done when tsc + eslint pass
+[x] 5. Settings Account section: pending-confirmation state (email + resend) replaces the sign-up CTA in SettingsScreen.hooks.ts — done when tsc + eslint pass
 [ ] 6. Settings Account section view wiring in SettingsScreen.tsx — done when tsc + eslint pass
 [ ] 7. New onboarding route app/(onboarding)/sign-up.tsx reusing AuthScreen with a skip affordance, ordered first after welcome — done when tsc + eslint pass
 ```
