@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, radius, spacing, typography } from "@/constants";
-import { useAuthController } from "@/controllers/useAuthController";
+import {
+  RESEND_GRACE_MS,
+  useAuthController,
+} from "@/controllers/useAuthController";
 import { Button, TextField } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
 
@@ -15,6 +18,29 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<AuthMode>("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Ticks while a confirmation is pending so the resend button re-enables
+  // when the grace period lapses without any user interaction.
+  const [now, setNow] = useState(() => Date.now());
+
+  const pendingSignup = ctrl.pendingSignup;
+
+  useEffect(() => {
+    if (!pendingSignup) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 30_000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [pendingSignup]);
+
+  const canResend =
+    pendingSignup !== null &&
+    now - new Date(pendingSignup.lastSentAt).getTime() >= RESEND_GRACE_MS;
 
   const handleSubmit = () => {
     if (mode === "signIn") {
@@ -74,12 +100,27 @@ export default function AuthScreen() {
 
       {ctrl.error ? <Text style={textStyles.errorText}>{ctrl.error}</Text> : null}
 
-      {ctrl.pendingConfirmation ? (
+      {pendingSignup ? (
         <View style={styles.noticeCard}>
           <Text style={styles.noticeText}>
-            Account created — check your inbox to confirm your email, then
-            sign in here.
+            Account created — confirm via the mail sent to{" "}
+            {pendingSignup.email}, then sign in here.
           </Text>
+          <Button
+            label="Resend confirmation mail"
+            variant="ghost"
+            size="sm"
+            onPress={() => {
+              void ctrl.resendConfirmation();
+            }}
+            disabled={!canResend}
+            loading={ctrl.loading}
+          />
+          {!canResend ? (
+            <Text style={styles.noticeText}>
+              A mail was sent recently — resend unlocks in a few minutes.
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -147,6 +188,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.subtle,
     backgroundColor: colors.background.card,
+    gap: spacing.sm,
   },
 
   noticeText: {
