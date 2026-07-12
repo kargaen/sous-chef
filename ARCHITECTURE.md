@@ -6,9 +6,7 @@
 
 ## Mission
 
-See [README.md](./README.md) for the full mission statement and product overview.
-
-Every architectural decision should serve this mission. The app must feel warm and opinionated, not mechanical. The LLM is a collaborator embedded throughout — not a chatbot bolted on the side.
+The app must feel warm and opinionated, not mechanical. The LLM is a collaborator embedded throughout — not a chatbot bolted on the side. Every architectural decision should serve this mission.
 
 ---
 

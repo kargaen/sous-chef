@@ -4,3 +4,4 @@ Append-only. Every Description amendment adds one row. Constitution changes do n
 
 | Date | Epic | Sections | Change |
 |---|---|---|---|
+| 2026-07-12 | PR #4 (pre-governance Supabase Phase 1) | §2, §4 | Supabase auth + snapshot backup/restore shipped: SupabaseService/SnapshotService/BackupService, authStore, auth/backup controllers, AuthScreen + /auth route, supabase/ migrations applied via workflow migrate-db jobs, EXPO_PUBLIC_SUPABASE_* in eas.json. |

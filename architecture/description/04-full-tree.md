@@ -23,6 +23,7 @@ sous-chef/
 │   │   ├── [id].tsx                            # Recipe detail with LLM adaptation panel
 │   │   └── adapt.tsx                           # Full-screen recipe adaptation flow
 │   │
+│   ├── auth.tsx                                # Email/password sign-in for backup/restore (re-exports AuthScreen)
 │   ├── chat.tsx                                # Free-form sous chef conversation
 │   ├── shopping-list.tsx                       # Generated list, shareable
 │   ├── chef-profile.tsx                        # Habits, preferences, history
@@ -78,6 +79,8 @@ sous-chef/
 │   │   │                                       # Each hook owns loading/error state for its domain.
 │   │   │                                       # Screens import one controller hook; nothing else.
 │   │   │
+│   │   ├── useAuthController.ts                # Supabase sign in/up/out; writes authStore
+│   │   ├── useBackupController.ts              # backupNow/restoreNow; stamps lastBackupAt
 │   │   ├── useChefController.ts                # Profile reads/writes, onboarding completion, skill tracking
 │   │   ├── useRecipeController.ts              # Search, filter, personalise results against chef profile
 │   │   ├── usePantryController.ts              # CRUD items, trigger expiry checks, log waste events
@@ -148,6 +151,7 @@ sous-chef/
 │   │   │   ├── RecipeScreen.tsx                # Full recipe with adaptation panel
 │   │   │   ├── ChatScreen.tsx                  # Free-form sous chef conversation
 │   │   │   ├── ShoppingListScreen.tsx          # Derived list; check off + share
+│   │   │   ├── AuthScreen.tsx                  # Email/password sign-in/up; signed-in state + sign out
 │   │   │   ├── ChefProfileScreen.tsx           # Habits, preferences, history timeline
 │   │   │   ├── SettingsScreen.tsx
 │   │   │   └── onboarding/
@@ -183,6 +187,12 @@ sous-chef/
 │   │   │
 │   │   ├── PricingService.ts                   # Estimates recipe cost from ingredient quantities + regional prices
 │   │   │                                       # Cached; refreshed weekly
+│   │   │
+│   │   ├── SnapshotService.ts                  # Assembles the versioned AppSnapshot from repository reads;
+│   │   │                                       # geminiApiKey redacted by explicit allowlist
+│   │   │
+│   │   ├── BackupService.ts                    # backupNow / restoreFromRemote — ties session + snapshot +
+│   │   │                                       # SupabaseService; restore is an id-preserving merge, never a wipe
 │   │   │
 │   │   ├── StorageService.ts                   # Unified wrapper over SQLite (Expo SQLite) and AsyncStorage
 │   │   │                                       # Handles migrations, serialisation, and error normalisation
@@ -221,6 +231,7 @@ sous-chef/
 │   │   │                                       # Controllers write to store; views read via hooks
 │   │   │
 │   │   ├── index.ts                            # Compose and export all slices
+│   │   ├── authStore.ts                        # Supabase session/user/status + lastBackupAt; in-memory only
 │   │   ├── cookbookStore.ts                    #
 │   │   ├── pantryStore.ts                      # Live pantry state; persisted to AsyncStorage
 │   │   ├── mealPlanStore.ts                    # Active week plan; derived shopping list
@@ -285,7 +296,10 @@ sous-chef/
 ├── app.json                                    # Expo config — bundle ID, permissions, splash, icons
 ├── babel.config.js
 ├── tsconfig.json                               # strict: true; path aliases for src/
-├── eas.json                                    # EAS Build profiles — development, preview, production
+├── supabase/                                   # Supabase CLI project marker + tracked SQL migrations
+│   ├── config.toml                             # Minimal marker so `supabase link` works in CI
+│   └── migrations/                             # Applied by the workflows' migrate-db job before any build
+├── eas.json                                    # EAS Build profiles — development, preview, production; carries EXPO_PUBLIC_SUPABASE_* for compiled builds
 ├── package.json
 └── README.md
 ```
