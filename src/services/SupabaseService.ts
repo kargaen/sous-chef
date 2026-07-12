@@ -71,6 +71,23 @@ export const SupabaseService = {
     }
   },
 
+  // Re-fires the sign-up confirmation mail for a pending account. The grace
+  // period lives in the caller (useAuthController) — this is just the seam.
+  resendSignUpConfirmation: async (email: string): Promise<void> => {
+    try {
+      const { error } = await getClient().auth.resend({
+        type: "signup",
+        email,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      throw wrapSupabaseError("resendSignUpConfirmation", error);
+    }
+  },
+
   signOut: async (): Promise<void> => {
     try {
       const { error } = await getClient().auth.signOut();
