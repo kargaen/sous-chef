@@ -25,9 +25,23 @@ And completing the last step lands the user in the app (tabs)
   `AuthScreen`, but nothing routes to it as a wizard step.
 - The only entry is Settings' "Run intro wizard again" → `/welcome`, which dead-ends.
 
+### Flow 2: Onboarding shell excludes the chat launcher
+
+```gherkin
+Given the user is anywhere in the onboarding wizard
+When any onboarding screen renders
+Then the floating chatbot launcher is not shown
+And it renders only on the standard/tabs shell
+```
+
+Verified (owner device test, 2026-07-12): the launcher currently appears on the
+welcome screen. It is mounted by the app shell globally rather than by the
+tabs-only layout — this epic moves it so onboarding gets a clean shell.
+
 **Out of scope:** the content of the taste-profile / kitchen-setup screens themselves
 (they stay placeholders until their own epics); this epic is navigation + first-run
-gating only.
+gating + the onboarding shell only. The welcome screen's real copy is its own later
+slice — this epic only needs a Continue/Next affordance to exist.
 
 ---
 
