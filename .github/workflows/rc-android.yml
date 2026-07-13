@@ -11,6 +11,9 @@ on:
       - '.claude/**'
       - '**.md'
       - '.github/**'
+  # Manual cut of an RC without a code push — used to republish, or to build a
+  # deliberate candidate from the current dev tip.
+  workflow_dispatch:
 
 jobs:
   migrate-db:
@@ -108,7 +111,17 @@ jobs:
           BASE=$(echo "$FULL" | sed 's/-rc.*//')
           echo "tag=v${BASE}-rc" >> $GITHUB_OUTPUT
 
-      - name: Create or overwrite RC release
+      # Delete the previous RC release + tag first so the republished release
+      # carries a fresh publish date. softprops/action-gh-release only swaps the
+      # asset and keeps the original published_at, which makes an up-to-date RC
+      # look weeks stale and invites deleting it by mistake.
+      - name: Delete existing RC release and tag
+        shell: bash
+        run: gh release delete "${{ steps.version.outputs.tag }}" --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create RC release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
