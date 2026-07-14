@@ -62,7 +62,7 @@ segments). The one unit-testable piece is the completion flag.
 ## 4. Checklist
 
 ```md
-[ ] 1. Hide the chat launcher on onboarding — app/_layout.tsx renders <AssistantShell/> only when useSegments()[0] !== "(onboarding)". One file. done when tsc/eslint pass and the launcher is gone from the welcome screen on device. (Q1-independent — ship first.)
+[x] 1. Hide the chat launcher on onboarding — app/_layout.tsx renders <AssistantShell/> only when useSegments()[0] !== "(onboarding)". One file. done when tsc/eslint pass and the launcher is gone from the welcome screen on device. (Q1-independent — ship first.)
 [ ] 2. Add onboardingCompleted:boolean (default false) to AppSettings — Settings.types.ts, then SettingsSchema.ts, then default_settings.ts (config triad, additive). done when the schema test covers the new field and tsc passes.
 [ ] 3. First-run gate — app/index.tsx redirects to /(onboarding)/welcome when settings.onboardingCompleted is false, else /(tabs); reads settings already loaded at boot. done when tsc/eslint pass and a reset DB lands on welcome.
 [ ] 4. Welcome step gains a Continue affordance → router.push("/(onboarding)/sign-up"). One file (WelcomeScreen). done when tsc/eslint pass.

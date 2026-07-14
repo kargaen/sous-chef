@@ -1,5 +1,5 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { Stack } from "expo-router";
+import { Stack, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -27,8 +27,13 @@ const LAUNCHER_BOTTOM_CLEARANCE = 88;
 
 export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
+  const segments = useSegments();
   const settings = useSettingsStore((state) => state.settings);
   const setSettings = useSettingsStore((state) => state.setSettings);
+
+  // Onboarding runs in its own clean shell — the floating chat launcher belongs
+  // to the standard app, not the intro flow.
+  const inOnboarding = segments[0] === "(onboarding)";
 
   useEffect(() => {
     let mounted = true;
@@ -99,7 +104,7 @@ export default function RootLayout() {
         <Stack.Screen name="recipe/reflect" />
         <Stack.Screen name="recipe/edit" />
       </Stack>
-      <AssistantShell />
+      {!inOnboarding ? <AssistantShell /> : null}
       <SousChefCompanionHost />
     </>
   );
