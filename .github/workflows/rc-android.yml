@@ -56,6 +56,21 @@ jobs:
           node-version: 20
           cache: npm
 
+      # Fail loudly BEFORE spending an EAS build if the version wasn't bumped:
+      # package.json still carries an -rc for a base version that already has a
+      # stable release. This is the owner's "no new version registered" guard
+      # (EPIC-008) and doubles as the post-release reminder to bump.
+      - name: Guard — RC version not yet released
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE=$(node -p "require('./package.json').version" | sed 's/-rc.*//')
+          if gh release view "v${BASE}" >/dev/null 2>&1; then
+            echo "::error::package.json is still v${BASE}-rc but stable v${BASE} is already released. Bump the version (npm version prepatch/preminor/premajor --preid rc) before cutting a new RC."
+            exit 1
+          fi
+          echo "RC target v${BASE}-rc has no stable release yet — proceeding."
+
       - name: Install dependencies
         run: npm ci
 
