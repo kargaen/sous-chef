@@ -26,6 +26,7 @@ export const AppSettingsSchema = z.object({
     .optional()
     .default("monthly"),
   geminiModel: z.string().optional().default(""),
+  onboardingCompleted: z.boolean().optional().default(false),
 });
 
 export type AppSettingsInput = z.infer<typeof AppSettingsSchema>;
