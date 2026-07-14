@@ -68,7 +68,7 @@ segments). The one unit-testable piece is the completion flag.
 [x] 4. Welcome step gains a Continue affordance → router.push("/(onboarding)/sign-up"). One file (WelcomeScreen). done when tsc/eslint pass.
 [x] 5. Sign-up step continues the wizard — a wizard footer (Skip / Continue) around AuthScreen → /(onboarding)/taste-profile, without awaiting confirmation. done when tsc/eslint pass.
 [x] 6. taste-profile Continue → kitchen-setup. One file. done when tsc/eslint pass.
-[ ] 7. kitchen-setup Finish sets onboardingCompleted=true (useSettingsController.updateField) and router.replace("/(tabs)"). One file. done when tsc/eslint pass and finishing lands in tabs and does not re-show onboarding on relaunch.
+[x] 7. kitchen-setup Finish sets onboardingCompleted=true (useSettingsController.updateField) and router.replace("/(tabs)"). One file. done when tsc/eslint pass and finishing lands in tabs and does not re-show onboarding on relaunch.
 ```
 
 ---
