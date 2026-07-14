@@ -1,1 +1,1 @@
-export { default } from "../../src/views/screens/AuthScreen";
+export { default } from "../../src/views/screens/onboarding/SignUpStepScreen";
