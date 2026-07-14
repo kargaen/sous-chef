@@ -1,6 +1,6 @@
 # EPIC-008: RC Versioning & Release Lifecycle
 
-**Status:** draft
+**Status:** closed
 **Created:** 2026-07-13
 **Architecture baseline:** 71ed373 (dev)
 **Source:** owner review of the pre-release workflow. Decision: Option A (RCs target the next dictated version, fail loudly when the version wasn't bumped); no versionless fallback (it would silence the guard); manual version bumps.
@@ -75,7 +75,7 @@ change. No unit-test harness covers CI YAML in this repo.
 ```md
 [x] 1. rc-android.yml: add a loud pre-build guard — if `gh release view v${BASE}` (stable) succeeds, emit ::error:: and exit 1 before the EAS build. One file — done when a dispatched run with a colliding stable version fails fast with the message, and a normal run still builds.
 [x] 2. release-android.yml: derive stable version as the -rc-stripped base, publish v${BASE}, then `gh release delete v${BASE}-rc --yes --cleanup-tag || true`. One file — done when a dispatched/master run publishes the stable release and the matching RC is gone.
-[ ] 3. Document the version lifecycle + bump commands in architecture/description/02-stack.md (or a release-process description note) via epic-closeout — done when the Description records how RCs and stable releases are versioned.
+[x] 3. Document the version lifecycle + bump commands in architecture/description/02-stack.md (or a release-process description note) via epic-closeout — done when the Description records how RCs and stable releases are versioned.
 ```
 
 ---

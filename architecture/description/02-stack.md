@@ -13,5 +13,20 @@
 | Validation  | Zod                                 | Schemas in `src/models/schemas/`; single source of truth for data shapes       |
 | Testing     | Jest + React Native Testing Library | Unit tests mirror the MVC split                                                |
 
+### Release process
+
+Versioning is owner-dictated via `package.json` (EPIC-008):
+
+- **RC channel** — `package.json` carries the next target as a pre-release, e.g.
+  `1.0.2-rc.0`, set with `npm version prepatch|preminor|premajor --preid rc`.
+  Pushes to `dev` (and manual `workflow_dispatch`) build `rc-android.yml`, which
+  publishes the `v{base}-rc` pre-release (suffix stripped), fresh-dated each run.
+  A guard fails the RC loudly, before spending an EAS build, if a stable
+  `v{base}` release already exists — the signal to bump the version.
+- **Stable release** — merging `dev` → `master` runs `release-android.yml`, which
+  tags the `-rc`-stripped base `v{base}`, then deletes the superseded `v{base}-rc`.
+- CI never rewrites `package.json`; the RC guard is the post-release reminder to bump.
+- Both workflows apply Supabase migrations (`migrate-db`) before building.
+
 ---
 
