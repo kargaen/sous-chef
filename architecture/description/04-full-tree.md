@@ -7,7 +7,7 @@ sous-chef/
 │   ├── (onboarding)/                           # Route group: invisible to navigation path
 │   │   ├── _layout.tsx                         # Onboarding shell layout
 │   │   ├── welcome.tsx                         # Brand intro + value proposition
-│   │   ├── sign-up.tsx                         # Backup account sign-up (re-exports AuthScreen); wizard wiring is EPIC-007
+│   │   ├── sign-up.tsx                         # Onboarding sign-up step (re-exports SignUpStepScreen)
 │   │   ├── taste-profile.tsx                   # Capture dietary needs, dislikes, skill level
 │   │   └── kitchen-setup.tsx                   # Equipment inventory, fridge/pantry baseline
 │   │
@@ -156,10 +156,11 @@ sous-chef/
 │   │   │   ├── AuthScreen.tsx                  # Email/password sign-in/up; signed-in state + sign out
 │   │   │   ├── ChefProfileScreen.tsx           # Habits, preferences, history timeline
 │   │   │   ├── SettingsScreen.tsx
-│   │   │   └── onboarding/
+│   │   │   └── onboarding/                       # Wizard steps: welcome → sign-up → taste-profile → kitchen-setup → app
 │   │   │       ├── WelcomeScreen.tsx
+│   │   │       ├── SignUpStepScreen.tsx          # Reuses AuthScreen with a Skip/Continue wizard footer
 │   │   │       ├── TasteProfileScreen.tsx
-│   │   │       └── KitchenSetupScreen.tsx
+│   │   │       └── KitchenSetupScreen.tsx        # Finish sets onboardingCompleted + enters the app
 │   │   ├── styles/                             # Shared view styles — screen/card/text layout primitives
 │   │   │   │                                   # Imports constants only; no domain knowledge or business logic
 │   │   │   ├── screenStyles.ts                 # Common screen, scroll, header, action-row, and list layouts

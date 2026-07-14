@@ -1,6 +1,6 @@
 # EPIC-007: Onboarding Wizard Navigation
 
-**Status:** draft
+**Status:** closed
 **Created:** 2026-07-12
 **Architecture baseline:** afeeee3 (epic/006-onboarding-signup)
 **Source:** discovered while implementing EPIC-006 item 7 — the intro wizard has no working step-to-step navigation, so "sign-up first, skip continues the flow" had no flow to plug into.
