@@ -8,3 +8,4 @@ Append-only. Every Description amendment adds one row. Constitution changes do n
 | 2026-07-12 | cleanup follow-up | §4 | Removed nonexistent README.md from the tree (owner: no README wanted now). |
 | 2026-07-12 | EPIC-006 | §4 | Added PendingSignupRepository and the app/(onboarding)/sign-up.tsx route; persisted pending email-confirmation + gated resend across AuthScreen and Settings. |
 | 2026-07-13 | EPIC-008 | §2 | Documented the RC/stable release lifecycle: owner-dictated package.json versioning, RC guard, and master finalize + RC cleanup. |
+| 2026-07-13 | EPIC-007 | §4 | Onboarding wizard navigation: first-run gate (onboardingCompleted setting), welcome→sign-up→taste-profile→kitchen-setup chaining, SignUpStepScreen, and the chat launcher hidden on the onboarding shell. |

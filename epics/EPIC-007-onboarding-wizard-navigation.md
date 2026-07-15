@@ -1,6 +1,6 @@
 # EPIC-007: Onboarding Wizard Navigation
 
-**Status:** draft
+**Status:** closed
 **Created:** 2026-07-12
 **Architecture baseline:** afeeee3 (epic/006-onboarding-signup)
 **Source:** discovered while implementing EPIC-006 item 7 — the intro wizard has no working step-to-step navigation, so "sign-up first, skip continues the flow" had no flow to plug into.
@@ -62,13 +62,13 @@ segments). The one unit-testable piece is the completion flag.
 ## 4. Checklist
 
 ```md
-[ ] 1. Hide the chat launcher on onboarding — app/_layout.tsx renders <AssistantShell/> only when useSegments()[0] !== "(onboarding)". One file. done when tsc/eslint pass and the launcher is gone from the welcome screen on device. (Q1-independent — ship first.)
-[ ] 2. Add onboardingCompleted:boolean (default false) to AppSettings — Settings.types.ts, then SettingsSchema.ts, then default_settings.ts (config triad, additive). done when the schema test covers the new field and tsc passes.
-[ ] 3. First-run gate — app/index.tsx redirects to /(onboarding)/welcome when settings.onboardingCompleted is false, else /(tabs); reads settings already loaded at boot. done when tsc/eslint pass and a reset DB lands on welcome.
-[ ] 4. Welcome step gains a Continue affordance → router.push("/(onboarding)/sign-up"). One file (WelcomeScreen). done when tsc/eslint pass.
-[ ] 5. Sign-up step continues the wizard — a wizard footer (Skip / Continue) around AuthScreen → /(onboarding)/taste-profile, without awaiting confirmation. done when tsc/eslint pass.
-[ ] 6. taste-profile Continue → kitchen-setup. One file. done when tsc/eslint pass.
-[ ] 7. kitchen-setup Finish sets onboardingCompleted=true (useSettingsController.updateField) and router.replace("/(tabs)"). One file. done when tsc/eslint pass and finishing lands in tabs and does not re-show onboarding on relaunch.
+[x] 1. Hide the chat launcher on onboarding — app/_layout.tsx renders <AssistantShell/> only when useSegments()[0] !== "(onboarding)". One file. done when tsc/eslint pass and the launcher is gone from the welcome screen on device. (Q1-independent — ship first.)
+[x] 2. Add onboardingCompleted:boolean (default false) to AppSettings — Settings.types.ts, then SettingsSchema.ts, then default_settings.ts (config triad, additive). done when the schema test covers the new field and tsc passes.
+[x] 3. First-run gate — app/index.tsx redirects to /(onboarding)/welcome when settings.onboardingCompleted is false, else /(tabs); reads settings already loaded at boot. done when tsc/eslint pass and a reset DB lands on welcome.
+[x] 4. Welcome step gains a Continue affordance → router.push("/(onboarding)/sign-up"). One file (WelcomeScreen). done when tsc/eslint pass.
+[x] 5. Sign-up step continues the wizard — a wizard footer (Skip / Continue) around AuthScreen → /(onboarding)/taste-profile, without awaiting confirmation. done when tsc/eslint pass.
+[x] 6. taste-profile Continue → kitchen-setup. One file. done when tsc/eslint pass.
+[x] 7. kitchen-setup Finish sets onboardingCompleted=true (useSettingsController.updateField) and router.replace("/(tabs)"). One file. done when tsc/eslint pass and finishing lands in tabs and does not re-show onboarding on relaunch.
 ```
 
 ---

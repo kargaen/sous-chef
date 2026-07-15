@@ -19,4 +19,5 @@ export interface AppSettings {
   defaultPlanLength?: number;
   pantryNudgeFrequency?: PantryNudgeFrequency;
   geminiModel?: string;
+  onboardingCompleted?: boolean;
 }
