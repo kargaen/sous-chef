@@ -146,11 +146,11 @@ history must be saved (owner decision, 2026-07-16) — it is in this epic's sync
 snapshot-only.
 
 ```md
-[ ] 1. Add failing test asserting `useChefController`'s created-profile id matches RFC 4122 §4.4
+[x] 1. Add failing test asserting `useChefController`'s created-profile id matches RFC 4122 §4.4
        in `src/controllers/useChefController.test.tsx` (new file, `.tsx` to match this
        directory's existing controller-test convention) — done when it fails because the
        current id is `chef_<timestamp>`
-[ ] 2. Implement: swap `chef_${Date.now()}` for `Crypto.randomUUID()` in
+[x] 2. Implement: swap `chef_${Date.now()}` for `Crypto.randomUUID()` in
        `src/controllers/useChefController.ts` — done when item 1 passes
 [ ] 3. Add failing test asserting new pantry-item ids match RFC 4122 §4.4 in
        `src/controllers/usePantryController.test.tsx` (new file, `.tsx` convention) — done when
