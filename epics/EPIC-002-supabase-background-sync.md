@@ -120,6 +120,7 @@ string-pattern match; there is no numeric quantity to bound.
 | 1 | `useCookbookController` cookbook-create id | RFC 4122 §4.4 | same regex | exact match |
 | 1 | `AdaptationService` ingredient-id and recipe-id fallbacks | RFC 4122 §4.4 | same regex | exact match |
 | 1 | `recipeBuilder.createRecipeId()` | RFC 4122 §4.4 | same regex | exact match |
+| 1 | `CookLogRepository.createId()` (shared by log entry/rating/note/category) | RFC 4122 §4.4 | same regex | exact match |
 
 ### What is deliberately not tested
 
@@ -137,10 +138,12 @@ the owner's phase-level roadmap (below the checklist) until each is sliced by it
 `epic-formulation` pass, per that skill's support for adding items incrementally as work
 reaches them.
 
-Verified scope: grep for `Date.now()` id-mint call sites (2026-07-16, baseline above) found 6
+Verified scope: grep for `Date.now()` id-mint call sites (2026-07-16, baseline above) found 7
 files with **in-scope** sites — not the "~8 sites" the prior revision claimed. The remaining
 `Date.now()` matches in the codebase are either non-id timing/cache code or out-of-scope
-domains, both listed in §1.
+domains, both listed in §1. `CookLogRepository.ts` is included per Q3's resolution below: cook
+history must be saved (owner decision, 2026-07-16) — it is in this epic's sync domain, not
+snapshot-only.
 
 ```md
 [ ] 1. Add failing test asserting `useChefController`'s created-profile id matches RFC 4122 §4.4
@@ -180,6 +183,13 @@ domains, both listed in §1.
         `recipe-<timestamp>-<rand>` format
 [ ] 12. Implement: swap the literal in `createRecipeId()` in `src/utils/recipeBuilder.ts` for
         `Crypto.randomUUID()` — done when item 11 passes
+[ ] 13. Add failing test asserting `CookLogRepository.createId()`'s output matches RFC 4122
+        §4.4 in `src/models/repositories/CookLogRepository.test.ts` (new file) — done when it
+        fails for the current `<prefix>_<timestamp>_<rand>` format
+[ ] 14. Implement: swap the literal in `createId(prefix)` in
+        `src/models/repositories/CookLogRepository.ts` for `Crypto.randomUUID()` (drop the
+        `prefix` argument and its callers' prefixes — a UUID does not need one) — done when
+        item 13 passes
 ```
 
 ### Planned phases (not yet sliced into checklist items)
@@ -190,18 +200,21 @@ P2.2  Additive per-record metadata: updatedAt (stamped on write) + rev (monotoni
       demoted to display/tiebreak only, per the owner's resolution of Q1 below). Optional Zod
       fields so old rows parse, mirroring the onboardingCompleted precedent
       (Settings.types.ts / SettingsSchema.ts / SettingsRepository.ts).
-      Verified scope (7 domains, corrected from the prior revision's "six affected repos" for
-      P2.3 — PlanPreset was missing): Pantry, Recipe, Cookbook, MealPlan (covers plan + slot),
-      PlanPreset, Budget (covers BudgetPeriod + SpendEntry), ChefProfile.
+      Verified scope (8 domains, corrected from the prior revision's "six affected repos" for
+      P2.3 — PlanPreset was missing, and Q3 has since added CookLogRepository): Pantry, Recipe,
+      Cookbook, MealPlan (covers plan + slot), PlanPreset, Budget (covers BudgetPeriod +
+      SpendEntry), ChefProfile, CookLogRepository (covers cook log entry, rating, note, category).
       Files per domain: <Domain>.types.ts, <Domain>Schema.ts, <Domain>Repository.ts — except
       PlanPreset, which has no schema file (PlanPresetRepository reads/writes a raw AsyncStorage
       array with no Zod validation today), so only its type (shared with MealPlan.types.ts) and
       PlanPresetRepository.ts need touching.
-P2.3  Soft-delete: delete → deletedAt; every read filters deletedAt IS NULL. Same 7 repos as
+P2.3  Soft-delete: delete → deletedAt; every read filters deletedAt IS NULL. Same 8 repos as
       P2.2. PlanPresetRepository's delete() is currently a hard delete (splice from the array) —
-      it needs the same soft-delete conversion as the SQLite-backed repos.
+      it needs the same soft-delete conversion as the SQLite-backed repos. Cook log entries are
+      normally append-only in the UI today (no delete affordance exists yet) — confirm at P2.3
+      time whether a tombstone path is needed now or deferred until a delete affordance ships.
 P2.4  sync_queue table in StorageService + RESET_TABLES; markDirty(table, id) called from each
-      of the 7 repos' write paths.
+      of the 8 repos' write paths.
 P2.5  Backend prerequisite for P2.5/P2.6: per-domain remote tables mirroring the snapshot shape
       + updated_at/deleted_at/rev, each with auth.uid() = user_id RLS, as a tracked migration in
       supabase/migrations/, applied by the workflows' migrate-db job. SyncService push: drain
@@ -237,7 +250,7 @@ interactive merge arena.
 |---|---|---|---|
 | Q1 | Include a `rev` counter in P2.2, or defer (LWW works on updatedAt + deviceId alone)? | P2.2 | **Resolved 2026-07-16: include it.** A monotonic per-record integer is immune to clock skew/jumps between devices, which a pure `updatedAt` timestamp is not; `updatedAt` is demoted to tiebreak/display only. |
 | Q2 | Snapshot backups and incremental sync coexist — when does whole-snapshot backup retire, if ever? | Nothing | by P2.6 |
-| Q3 | Is cook history (`CookLogRepository`) part of this epic's incremental-sync domain, or does it stay snapshot-only (Phase 1) forever? The owner's Phase-2 plan names "pantry, recipes, plans, budget, or profile" and does not mention cook history; `CookLogRepository.createId()` is therefore **not** in P2.1's scope (§4) pending this answer. | P2.1 already excludes it either way; blocks whether a future P2.1-equivalent item ever touches `CookLogRepository.ts` | by P2.2 |
+| Q3 | Is cook history (`CookLogRepository`) part of this epic's incremental-sync domain, or does it stay snapshot-only (Phase 1) forever? | Was blocking whether P2.1 touches `CookLogRepository.ts` | **Resolved 2026-07-16: cook history must be saved** (owner decision) — it joins the incremental-sync domain alongside pantry/recipes/plans/budget/profile. `CookLogRepository.ts` is now items 13–14 in §4, and is an 8th repo in P2.2/P2.3's roadmap scope (added to the 7 already listed there). |
 
 ### New capability
 
