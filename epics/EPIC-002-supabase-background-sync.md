@@ -147,26 +147,30 @@ snapshot-only.
 
 ```md
 [ ] 1. Add failing test asserting `useChefController`'s created-profile id matches RFC 4122 §4.4
-       in `src/controllers/useChefController.test.ts` (new file) — done when it fails because
-       the current id is `chef_<timestamp>`
+       in `src/controllers/useChefController.test.tsx` (new file, `.tsx` to match this
+       directory's existing controller-test convention) — done when it fails because the
+       current id is `chef_<timestamp>`
 [ ] 2. Implement: swap `chef_${Date.now()}` for `Crypto.randomUUID()` in
        `src/controllers/useChefController.ts` — done when item 1 passes
 [ ] 3. Add failing test asserting new pantry-item ids match RFC 4122 §4.4 in
-       `src/controllers/usePantryController.test.ts` (new file) — done when it fails for the
-       current `pantry_<timestamp>` format at both mint sites
+       `src/controllers/usePantryController.test.tsx` (new file, `.tsx` convention) — done when
+       it fails for the current `pantry_<timestamp>` format at both mint sites
 [ ] 4. Implement: swap both `pantry_${Date.now()}` sites for `Crypto.randomUUID()` in
        `src/controllers/usePantryController.ts` — done when item 3 passes
 [ ] 5. Add failing test asserting `createPlan`'s plan id, `newSlotId()`'s slot id, and
        `savePreset`'s preset id all match RFC 4122 §4.4 in
-       `src/controllers/useMealPlanController.test.ts` (new file) — done when it fails for the
-       current `plan-<timestamp>` / `slot-<timestamp>` / `preset-<timestamp>` formats. Assert the
-       two `suggestion-` ids (draft slots) are unchanged — they stay out of scope.
+       `src/controllers/useMealPlanController.test.tsx` (new file, `.tsx` convention) — done
+       when it fails for the current `plan-<timestamp>` / `slot-<timestamp>` /
+       `preset-<timestamp>` formats. Assert the two `suggestion-` ids (draft slots) are
+       unchanged — they stay out of scope.
 [ ] 6. Implement: swap `newSlotId()`, `createPlan`'s id literal, and `savePreset`'s id literal in
        `src/controllers/useMealPlanController.ts` to `Crypto.randomUUID()` — done when item 5
        passes. Leave the `suggestion-${Date.now()}...` sites untouched.
-[ ] 7. Add failing test asserting new cookbook ids match RFC 4122 §4.4 in
-       `src/controllers/useCookbookController.test.ts` (new file) — done when it fails for the
-       current `<slug>-<timestamp base36>` format
+[ ] 7. Update the existing `"creates a cookbook with a slugged id and normalized fields"` test in
+       `src/controllers/useCookbookController.test.tsx` (existing file — this test already pins
+       the current `<slug>-<timestamp base36>` format via `jest.spyOn(Date, "now")`, and will
+       fail once item 8 lands unless updated first) to assert the id matches RFC 4122 §4.4
+       instead — done when the test fails against the current slugged-id implementation
 [ ] 8. Implement: swap `` `${slugifyCookbookId(title)}-${Date.now().toString(36)}` `` for
        `Crypto.randomUUID()` in `src/controllers/useCookbookController.ts` — done when item 7
        passes. Note: this drops the human-readable slug prefix from new cookbook ids; flag to
