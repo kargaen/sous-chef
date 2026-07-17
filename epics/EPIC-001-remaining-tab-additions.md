@@ -1,6 +1,6 @@
 # EPIC-001: Remaining Tab Additions
 
-**Status:** draft
+**Status:** closed
 **Created:** 2026-07-12
 **Architecture baseline:** 6839154 (dev, pre-shard)
 **Source:** evicted verbatim from `ARCHITECTURE.md` §5 "Upcoming Tab Additions" during the governance-bundle shard. Deferred-class content; the quoted text below is the original.
@@ -37,11 +37,10 @@ and no `discover.tsx`; the settings tab is the remaining work.
 No — a settings tab surfaces an existing surface; nothing about the warm,
 LLM-as-collaborator mission is traded.
 
-### Open questions
+### Resolution
 
-| # | Question | Blocks |
-|---|---|---|
-| Q1 | Is the settings tab still wanted, now that `/settings` is reachable via focus links from everywhere? | This epic entirely — confirm before implementing |
+Closed as stale by owner decision on 2026-07-17. The current top-level `/settings` route and
+front-page-only settings link are sufficient; do not add a Settings tab.
 
 ---
 
