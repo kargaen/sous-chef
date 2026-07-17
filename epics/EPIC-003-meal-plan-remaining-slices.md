@@ -1,6 +1,6 @@
 # EPIC-003: Meal Plan — Remaining Slices
 
-**Status:** draft
+**Status:** superseded by EPIC-010
 **Created:** 2026-07-12
 **Architecture baseline:** 5739e7d (dev, post-shard)
 **Source:** carved out of the retired root `MEAL_PLAN_EPIC.md` during governance cleanup. Everything else in that document is verified shipped (slot model, presets repository, scoped shopping with checked-state cache, bump/shift/extend, cooked tie-in via `CookLogRepository.recordCook`).
