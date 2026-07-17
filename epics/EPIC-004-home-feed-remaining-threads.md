@@ -1,6 +1,6 @@
 # EPIC-004: Home Feed — Remaining Merge Threads
 
-**Status:** draft
+**Status:** superseded by existing Home implementation
 **Created:** 2026-07-12
 **Architecture baseline:** 5739e7d (dev, post-shard)
 **Source:** carved out of the retired root `LANDING_DISCOVER_MERGE_EPIC.md` during governance cleanup. The merge itself is verified shipped (Discover lanes render in Home, tab bar is four destinations, GenerationZone + dismissal learning exist; the legacy `NudgeStrip` is already retired).
