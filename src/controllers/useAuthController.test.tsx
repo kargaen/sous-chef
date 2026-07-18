@@ -14,6 +14,21 @@ jest.mock("../services/SupabaseService", () => ({
   },
 }));
 
+jest.mock("../utils/logger", () => {
+  const mockAuthLogger = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    child: jest.fn(),
+  };
+
+  return {
+    createLogger: jest.fn(() => mockAuthLogger),
+    mockAuthLogger,
+  };
+});
+
 jest.mock("../models/repositories/PendingSignupRepository", () => {
   const mockPendingSignupRepository = {
     get: jest.fn(),
@@ -30,6 +45,7 @@ const { SupabaseService } = jest.requireMock("../services/SupabaseService");
 const { mockPendingSignupRepository } = jest.requireMock(
   "../models/repositories/PendingSignupRepository",
 );
+const { mockAuthLogger } = jest.requireMock("../utils/logger");
 
 const fakeSession = { user: { id: "user-1", email: "cook@example.com" } };
 
@@ -74,6 +90,25 @@ describe("useAuthController pending confirmation", () => {
       lastSentAt: expect.any(String),
     });
     expect(result.current.pendingSignup?.email).toBe("cook@example.com");
+  });
+
+  it("logs the underlying signUp failure for diagnostic exports", async () => {
+    const error = new Error(
+      "SupabaseService signUp failed: Email signups are disabled",
+    );
+    SupabaseService.signUp.mockRejectedValue(error);
+    const { result } = renderHook(() => useAuthController());
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.signUp("cook@example.com", "hunter22");
+    });
+
+    expect(result.current.error).toBe("Could not create account.");
+    expect(mockAuthLogger.error).toHaveBeenCalledWith(
+      "Sign up failed",
+      error,
+    );
   });
 
   it("clears pending when signUp returns a live session", async () => {

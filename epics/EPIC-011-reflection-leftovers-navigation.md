@@ -1,6 +1,6 @@
 # EPIC-011: Reflection Leftovers Navigation Bug
 
-**Status:** draft
+**Status:** active
 **Created:** 2026-07-17
 **Architecture baseline:** 078988c
 **Source:** Jot task “saving to pantry after a cook registers the cook and saves to pantry, but does not switch to the recipe route like saving normally does.”
@@ -38,6 +38,15 @@ And the app still leaves the reflection screen through the normal saved-cook rou
 And the cook is not recorded a second time
 ```
 
+### Flow 4: Skip reflection
+
+```gherkin
+Given the cook is on the reflection screen after cooking a recipe
+When they skip the reflection
+Then the cook is recorded exactly once without ratings
+And the app returns through the same safe-back route
+```
+
 **Out of scope for this epic:**
 - Changing how leftovers are named, portioned, or dated.
 - Redesigning the reflection screen or leftovers prompt.
@@ -72,6 +81,7 @@ How the flows in §1 become failing tests, and what each function call is measur
 | 1 | `handleSave` | Existing reflection save path in `ReflectionScreen` | `src/views/screens/ReflectionScreen.tsx` | Exactly one `onSave` call; existing `goBack` path reached |
 | 2 | `handleSave` | Existing leftovers persistence contract in `usePantryController` | `src/controllers/usePantryController.ts` | Exactly one `saveLeftoversFromCook` call; exactly one `onSave` call; `goBack` reached after pantry promise settles |
 | 3 | `handleSave` | Existing pantry failure alert copy in `ReflectionScreen` | `src/views/screens/ReflectionScreen.tsx` | Failure alert shown; `goBack` still reached; no second cook log call |
+| 4 | `handleSkip` | Existing skip path in `ReflectionScreen` | `src/views/screens/ReflectionScreen.tsx` | Exactly one `onSkip` call; no leftover save call; existing `goBack` path reached |
 
 ### What is deliberately not tested
 
@@ -83,10 +93,10 @@ How the flows in §1 become failing tests, and what each function call is measur
 
 ## 4. Checklist
 
-- [ ] 1. Add a failing reflection leftovers navigation test in `src/views/screens/ReflectionScreen.test.tsx` — done when “Save to pantry” proves one reflection save, one pantry save, and one normal post-save navigation.
-- [ ] 2. Fix the reflection save handler in `src/views/screens/ReflectionScreen.tsx` — done when item 1 passes and the non-pantry save path still leaves the screen.
-- [ ] 3. Add a failing pantry-failure navigation test in `src/views/screens/ReflectionScreen.test.tsx` — done when a rejected/false leftover save still shows the failure alert and exits without recording another cook.
-- [ ] 4. Confirm the existing skip path remains unchanged in `src/views/screens/ReflectionScreen.tsx` — done when skipping reflection still records a bare cook once and leaves through the same safe-back path.
+- [x] 1. Add a failing reflection leftovers navigation test in `src/views/screens/ReflectionScreen.test.tsx` — done when “Save to pantry” proves one reflection save, one pantry save, and one normal post-save navigation.
+- [x] 2. Fix the reflection save handler in `src/views/screens/ReflectionScreen.tsx` — done when item 1 passes and the non-pantry save path still leaves the screen.
+- [x] 3. Add a failing pantry-failure navigation test in `src/views/screens/ReflectionScreen.test.tsx` — done when a rejected/false leftover save still shows the failure alert and exits without recording another cook.
+- [x] 4. Confirm the existing skip path remains unchanged in `src/views/screens/ReflectionScreen.tsx` — done when skipping reflection still records a bare cook once and leaves through the same safe-back path.
 
 ---
 
@@ -110,7 +120,7 @@ No. This is a workflow bug fix that preserves the warm leftovers nudge while mak
 
 | # | Question | Blocks | Decision needed by |
 |---|---|---|---|
-| Q1 | Should the final route be a literal recipe detail route or the current `useSafeBack` destination? | Item 2 | Before implementation; recommended: keep `useSafeBack` unless the owner wants an explicit route replacement. |
+| Q1 | Should the final route be a literal recipe detail route or the current `useSafeBack` destination? | Resolved | **Resolved 2026-07-17: keep `useSafeBack`.** The implemented route uses the same safe-back callback for no-leftovers, pantry-success, pantry-failure, and skip paths. |
 
 ### New capability
 
