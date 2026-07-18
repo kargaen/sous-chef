@@ -5,6 +5,20 @@ import { useRecipeController } from "./useRecipeController";
 
 let mockCurrentProfile: ReturnType<typeof makeProfile> | null = null;
 
+
+jest.mock("../models/repositories/CookLogRepository", () => {
+  const mockCookLogRepository = {
+    getRatingCategories: jest.fn(),
+    getRecipeStats: jest.fn(),
+    saveRatingCategories: jest.fn(),
+  };
+
+  return {
+    CookLogRepository: jest.fn(() => mockCookLogRepository),
+    mockCookLogRepository,
+  };
+});
+
 jest.mock("../models/repositories/RecipeRepository", () => {
   const mockRecipeRepository = {
     fetchById: jest.fn(),
@@ -72,6 +86,9 @@ jest.mock("../store/sousChefCompanionStore", () => {
   };
 });
 
+const { mockCookLogRepository } = jest.requireMock(
+  "../models/repositories/CookLogRepository",
+);
 const { mockRecipeRepository } = jest.requireMock(
   "../models/repositories/RecipeRepository",
 );
@@ -103,6 +120,10 @@ describe("useRecipeController", () => {
     mockRecipeRepository.getSaved.mockReset();
     mockRecipeRepository.save.mockReset();
     mockRecipeRepository.search.mockReset();
+    mockCookLogRepository.getRatingCategories.mockReset();
+    mockCookLogRepository.getRecipeStats.mockReset();
+    mockCookLogRepository.saveRatingCategories.mockReset();
+    mockCookLogRepository.getRatingCategories.mockReturnValue([]);
     ClipboardService.getRecipeSourceSuggestion.mockReset();
     HabitService.record.mockReset();
     LLMService.send.mockReset();
@@ -272,12 +293,9 @@ describe("useRecipeController", () => {
     expect(LLMService.send).not.toHaveBeenCalled();
     expect(mockSousChefCompanionStore.showCompanion).toHaveBeenCalledWith(
       "happy",
-      expect.stringContaining("can't pull a full recipe from a link just yet"),
-      {
-        label: "Open assistant setup",
-        route: "/settings?focus=assistant",
-      },
+      expect.stringContaining("Try pasting the recipe text"),
     );
+    expect(result.current.error).toBe("Could not read that page.");
   });
 
   it("routes idea imports to the chef profile companion when profile context is missing", async () => {
@@ -325,15 +343,22 @@ describe("useRecipeController", () => {
         });
       });
 
-      expect(LLMService.send).toHaveBeenCalledWith({
-        system: expect.stringContaining("Name: Mira"),
-        messages: [
-          {
-            role: "user",
-            content: expect.stringContaining(source),
-          },
-        ],
-      });
+      expect(LLMService.send).toHaveBeenCalledWith(
+        {
+          system: expect.stringContaining("Name: Mira"),
+          messages: [
+            {
+              role: "user",
+              content: expect.stringContaining(source),
+            },
+          ],
+        },
+        "user",
+        expect.objectContaining({
+          onQueued: expect.any(Function),
+          onRateLimited: expect.any(Function),
+        }),
+      );
       expect(importedDraft).toEqual({
         title: "Imported Recipe",
         ingredientsText: "2 tbsp olive oil\n1 lemon",

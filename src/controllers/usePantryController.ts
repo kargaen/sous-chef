@@ -494,7 +494,7 @@ export const usePantryController = () => {
             role: "user",
             content: buildPantrySuggestionsPrompt({
               items: contextItems,
-              cuisinePreferences: profile.cuisinePreferences ?? [],
+              cuisinePreferences: profile.preferences.cuisinePreferences ?? [],
               skillLevel: profile.skillLevel ?? null,
               month: new Date().getMonth() + 1,
             }),
@@ -526,7 +526,7 @@ export const usePantryController = () => {
                 itemName,
                 [],
                 {
-                  cuisinePreferences: profile.cuisinePreferences ?? [],
+                  cuisinePreferences: profile.preferences.cuisinePreferences ?? [],
                   skillLevel: profile.skillLevel ?? null,
                   month: new Date().getMonth() + 1,
                 },
@@ -560,7 +560,7 @@ export const usePantryController = () => {
                 target.primaryItemName || target.title,
                 current.map((s) => s.title),
                 {
-                  cuisinePreferences: profile.cuisinePreferences ?? [],
+                  cuisinePreferences: profile.preferences.cuisinePreferences ?? [],
                   skillLevel: profile.skillLevel ?? null,
                   month: new Date().getMonth() + 1,
                 },

@@ -83,7 +83,6 @@ export const styles = StyleSheet.create({
   removeButton: {
     paddingTop: 2,
     paddingLeft: spacing.xs,
-    hitSlop: 8,
   },
 
   rowCooked: {
