@@ -3,8 +3,14 @@ import TestRenderer, { act } from "react-test-renderer";
 
 jest.mock("react-native", () => {
   const React = require("react");
-  const make = (name: string) => (props: Record<string, unknown>) =>
-    React.createElement(name, props, props.children);
+  const make = (name: string) => {
+    function MockComponent(props: Record<string, unknown>) {
+      return React.createElement(name, props, props.children);
+    }
+
+    MockComponent.displayName = name;
+    return MockComponent;
+  };
 
   return {
     Alert: { alert: jest.fn() },

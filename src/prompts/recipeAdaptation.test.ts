@@ -48,7 +48,7 @@ describe("buildAdaptationPrompt", () => {
     });
 
     expect(prompt).toContain("Return valid JSON only.");
-    expect(prompt).toContain("Write all user-facing text fields in Swedish.");
+    expect(prompt).toContain("Write all user-facing text fields in Swedish, even if the cook or the source material uses another language.");
     expect(prompt).toContain('Recipe title: "Rustic Lemon Pasta"');
     expect(prompt).toContain("Reason for adaptation: Make it healthier without losing character.");
     expect(prompt).toContain("- [ingredient-1] 200 g spaghetti");

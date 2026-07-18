@@ -3,6 +3,7 @@ import { StorageService } from "./StorageService";
 export type HabitEvent =
   | "pantry_item_added"
   | "pantry_item_removed"
+  | "pantry_item_used"
   | "recipe_cooked"
   | "recipe_saved"
   | "meal_plan_created"

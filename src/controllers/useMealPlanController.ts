@@ -592,7 +592,7 @@ export const useMealPlanController = () => {
         days,
         month: new Date().getMonth() + 1,
         region: profile?.region ?? null,
-        cuisinePreferences: profile?.cuisinePreferences ?? [],
+        cuisinePreferences: profile?.preferences.cuisinePreferences ?? [],
         skillLevel: profile?.skillLevel ?? null,
         pantryHighlights,
       });
@@ -650,7 +650,14 @@ export const useMealPlanController = () => {
       const prompt = buildMealPlanningPrompt({
         pantryItems,
         expiringItems,
-        budgetPeriod,
+        budgetPeriod: budgetPeriod
+          ? {
+              id: "draft-budget-period",
+              startDate: "",
+              endDate: "",
+              ...budgetPeriod,
+            }
+          : null,
         month: SeasonalService.getCurrentMonth(),
         region: profile.region,
         ...preferences,

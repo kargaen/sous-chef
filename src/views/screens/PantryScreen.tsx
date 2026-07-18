@@ -483,7 +483,7 @@ export default function PantryScreen() {
       {pendingPlanRecipeId && planDays.length > 0 ? (
         <View style={dayPickerStyles.section}>
           <Text style={textStyles.sectionTitle}>
-            Pick a day for "{pendingPlanTitle ?? "this recipe"}"
+            Pick a day for “{pendingPlanTitle ?? "this recipe"}”
           </Text>
           <View style={dayPickerStyles.chips}>
             {planDays.map((date) => (

@@ -128,7 +128,7 @@ export const useNewRecipeScreenView = () => {
         title: imported.title,
         ingredientsText: imported.ingredientsText,
         stepsText: imported.stepsText,
-        notes: imported.notes,
+        notes: imported.notes ?? "",
         cookbookId: params.cookbookId ?? null,
         servings: imported.servings,
         prepMinutes: imported.prepMinutes,
