@@ -37,12 +37,18 @@ export default function ReflectionScreen() {
           {
             text: "Save to pantry",
             onPress: () => {
-              void pantry.saveLeftoversFromCook(title).then((ok) => {
-                if (!ok) {
+              void (async () => {
+                try {
+                  const saved = await pantry.saveLeftoversFromCook(title);
+                  if (!saved) {
+                    Alert.alert("Couldn't save", "The pantry item could not be saved. You can add it manually from the Pantry tab.");
+                  }
+                } catch {
                   Alert.alert("Couldn't save", "The pantry item could not be saved. You can add it manually from the Pantry tab.");
+                } finally {
+                  goBack();
                 }
-                goBack();
-              });
+              })();
             },
           },
         ],

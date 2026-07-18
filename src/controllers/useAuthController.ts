@@ -5,6 +5,7 @@ import {
 } from "../models/repositories/PendingSignupRepository";
 import { SupabaseService } from "../services/SupabaseService";
 import { useAuthStore } from "../store/authStore";
+import { createLogger } from "../utils/logger";
 
 // Grace period between confirmation-mail sends (EPIC-006 flow 3). Supabase's
 // own resend cooldown is ~60s; this sits safely above it so the button can
@@ -12,6 +13,7 @@ import { useAuthStore } from "../store/authStore";
 export const RESEND_GRACE_MS = 5 * 60 * 1000;
 
 const pendingRepo = new PendingSignupRepository();
+const log = createLogger("useAuthController");
 
 export const useAuthController = () => {
   const [loading, setLoading] = useState(false);
@@ -60,7 +62,8 @@ export const useAuthController = () => {
         await pendingRepo.save(pending);
         setPendingSignup(pending);
       }
-    } catch {
+    } catch (error) {
+      log.error("Sign up failed", error);
       setError("Could not create account.");
     } finally {
       setLoading(false);
