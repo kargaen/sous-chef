@@ -11,6 +11,7 @@
 | DB migrations | Supabase CLI via GitHub Actions   | `supabase/migrations/` applied by the `migrate-db` job in both release workflows before any build |
 | LLM         | Google Gemini API                   | Prompt assembly in `src/prompts/`; streaming via `LLMService`. Anthropic/OpenAI adapters exist without a decided role — see EPIC-005 |
 | Validation  | Zod                                 | Schemas in `src/models/schemas/`; single source of truth for data shapes       |
+| Native date input | React Native DateTimePicker 8.4.4 | Expo-compatible platform date picker; registered as an Expo config plugin and first used by EPIC-013 |
 | Testing     | Jest + React Native Testing Library | Unit tests mirror the MVC split                                                |
 
 ### Release process
@@ -29,4 +30,3 @@ Versioning is owner-dictated via `package.json` (EPIC-008):
 - Both workflows apply Supabase migrations (`migrate-db`) before building.
 
 ---
-

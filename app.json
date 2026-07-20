@@ -53,7 +53,8 @@
           "photosPermission": "Allow Sous Chef to add photos of your dishes to your recipes.",
           "cameraPermission": "Allow Sous Chef to take photos of your dishes."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
