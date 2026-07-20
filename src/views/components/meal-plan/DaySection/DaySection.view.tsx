@@ -24,8 +24,12 @@ export interface DaySectionProps {
   resolveRecipeTitle: (recipeId: string) => string | null;
   onAddSlot: (date: string, type: MealSlotType, input: SlotInput) => void;
   onRemoveSlot: (slotId: string) => void;
-  onMarkCooked?: (slotId: string) => void;
   onAdapt?: (slotId: string, description: string) => void;
+  onOpenRecipe?: (recipeId: string) => void;
+  isSlotCooked?: (slot: MealSlot) => boolean;
+  convertingSlotId?: string | null;
+  onCreateRecipe?: (slotId: string) => void;
+  onCreateVariant?: (slotId: string) => void;
   onAcceptSuggestion: (slot: SuggestionSlot) => void;
   onRejectSuggestion: (id: string) => void;
   onSuggest?: (date: string, type: MealSlotType) => void;
@@ -42,8 +46,12 @@ export function DaySection({
   resolveRecipeTitle,
   onAddSlot,
   onRemoveSlot,
-  onMarkCooked,
   onAdapt,
+  onOpenRecipe,
+  isSlotCooked = () => false,
+  convertingSlotId,
+  onCreateRecipe,
+  onCreateVariant,
   onAcceptSuggestion,
   onRejectSuggestion,
   onSuggest,
@@ -80,8 +88,12 @@ export function DaySection({
               }
               pendingActions={pendingActions}
               onRemove={onRemoveSlot}
-              onMarkCooked={onMarkCooked}
               onAdapt={onAdapt}
+              onOpenRecipe={onOpenRecipe}
+              isCooked={isSlotCooked(slot)}
+              convertingSlotId={convertingSlotId}
+              onCreateRecipe={onCreateRecipe}
+              onCreateVariant={onCreateVariant}
             />
           </View>
         ))}

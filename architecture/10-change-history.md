@@ -9,3 +9,4 @@ Append-only. Every Description amendment adds one row. Constitution changes do n
 | 2026-07-12 | EPIC-006 | §4 | Added PendingSignupRepository and the app/(onboarding)/sign-up.tsx route; persisted pending email-confirmation + gated resend across AuthScreen and Settings. |
 | 2026-07-13 | EPIC-008 | §2 | Documented the RC/stable release lifecycle: owner-dictated package.json versioning, RC guard, and master finalize + RC cleanup. |
 | 2026-07-13 | EPIC-007 | §4 | Onboarding wizard navigation: first-run gate (onboardingCompleted setting), welcome→sign-up→taste-profile→kitchen-setup chaining, SignUpStepScreen, and the chat launcher hidden on the onboarding shell. |
+| 2026-07-20 | EPIC-013 dependency-change | §2 | Added Expo-compatible `@react-native-community/datetimepicker` 8.4.4 and its config plugin for native meal-plan start-date selection. |

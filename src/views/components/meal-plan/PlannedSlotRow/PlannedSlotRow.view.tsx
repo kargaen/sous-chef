@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Feather } from "@expo/vector-icons";
-import { Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 import { colors } from "@/constants";
 import type { AdaptationIntent, MealSlot, MealSlotType, SuggestionSlot } from "@/models/types";
@@ -22,6 +23,11 @@ export interface PlannedSlotRowProps {
   onRemove: (slotId: string) => void;
   onMarkCooked?: (slotId: string) => void;
   onAdapt?: (slotId: string, description: string) => void;
+  convertingSlotId?: string | null;
+  onCreateRecipe?: (slotId: string) => void;
+  onCreateVariant?: (slotId: string) => void;
+  onOpenRecipe?: (recipeId: string) => void;
+  isCooked?: boolean;
 }
 
 export function PlannedSlotRow({
@@ -29,14 +35,18 @@ export function PlannedSlotRow({
   recipeTitle,
   pendingActions,
   onRemove,
-  onMarkCooked,
   onAdapt,
+  convertingSlotId,
+  onCreateRecipe,
+  onCreateVariant,
+  onOpenRecipe,
+  isCooked = false,
 }: PlannedSlotRowProps) {
+  const [actionsOpen, setActionsOpen] = useState(false);
   const hasRecipe = !!slot.recipeId && !!recipeTitle;
+  const isConverting = convertingSlotId === slot.id;
   const scaleMultiplier =
     slot.servings != null && slot.servings > 0 ? slot.servings : null;
-  const isCooked = slot.status === "cooked";
-
   const slotActions = pendingActions.filter((a) => a.slotId === slot.id);
 
   return (
@@ -47,14 +57,26 @@ export function PlannedSlotRow({
 
       <View style={styles.contentColumn}>
         {hasRecipe ? (
-          <View style={[styles.recipeChip, isCooked && styles.recipeChipCooked]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open recipe ${recipeTitle}`}
+            disabled={!onOpenRecipe}
+            onPress={() => onOpenRecipe?.(slot.recipeId!)}
+            style={[styles.recipeChip, isCooked && styles.recipeChipCooked]}
+          >
             <Text style={[styles.recipeChipText, isCooked && styles.recipeChipTextCooked]}>
               {recipeTitle}
             </Text>
             {scaleMultiplier != null && !isCooked ? (
               <Text style={styles.scaleBadge}>· {scaleMultiplier} srv</Text>
             ) : null}
-          </View>
+          </Pressable>
+        ) : null}
+
+        {slot.text ? (
+          <Text style={[styles.noteText, isCooked && styles.noteTextCooked]}>
+            {slot.text}
+          </Text>
         ) : null}
 
         {slot.note ? (
@@ -91,19 +113,47 @@ export function PlannedSlotRow({
           : null}
       </View>
 
-      {!isCooked && onMarkCooked ? (
+      {isConverting ? (
+        <ActivityIndicator size="small" color={colors.brand.terracotta} />
+      ) : null}
+
+      <View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Mark ${TYPE_LABELS[slot.type]} as cooked`}
+          accessibilityLabel={`Open ${slot.type} meal actions`}
           hitSlop={8}
-          onPress={() => onMarkCooked(slot.id)}
+          onPress={() => setActionsOpen((open) => !open)}
           style={styles.cookButton}
         >
-          <Feather name="check-circle" size={16} color={colors.status.success} />
+          <Feather name="more-horizontal" size={16} color={colors.text.muted} />
         </Pressable>
-      ) : isCooked ? (
-        <Feather name="check-circle" size={16} color={colors.status.success} style={styles.cookButton} />
-      ) : null}
+
+        {actionsOpen && slot.text && !slot.recipeId && onCreateRecipe ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Create recipe"
+            onPress={() => {
+              setActionsOpen(false);
+              onCreateRecipe(slot.id);
+            }}
+          >
+            <Text style={styles.noteText}>Create recipe</Text>
+          </Pressable>
+        ) : null}
+
+        {actionsOpen && slot.recipeId && slot.note && onCreateVariant ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Create variant"
+            onPress={() => {
+              setActionsOpen(false);
+              onCreateVariant(slot.id);
+            }}
+          >
+            <Text style={styles.noteText}>Create variant</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       <Pressable
         accessibilityRole="button"

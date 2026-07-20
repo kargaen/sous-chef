@@ -25,6 +25,7 @@ import { AdaptationService } from "../services/AdaptationService";
 import { HabitService } from "../services/HabitService";
 import { InspirationService } from "../services/InspirationService";
 import { LLMService } from "../services/LLMService";
+import { RecipeImportService } from "../services/RecipeImportService";
 import { SeasonalService } from "../services/SeasonalService";
 import { useChefProfileStore } from "../store/chefProfileStore";
 import { useMealPlanStore } from "../store/mealPlanStore";
@@ -94,6 +95,11 @@ const newSlotId = (): string =>
 export const useMealPlanController = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [convertingSlotId, setConvertingSlotId] = useState<string | null>(null);
+  const [pendingSlotVariant, setPendingSlotVariant] = useState<{
+    slotId: string;
+    recipe: Recipe;
+  } | null>(null);
   const [savedRecipes, setSavedRecipes] = useState<Recipe[]>([]);
   const [presets, setPresets] = useState<PlanPreset[]>([]);
 
@@ -196,23 +202,21 @@ export const useMealPlanController = () => {
     });
   };
 
-  // Mark a slot cooked: set status="cooked" on the plan and log to CookLog
-  // if the slot has a linked recipe. Silently no-ops if the slot isn't found.
-  const markSlotCooked = async (slotId: string): Promise<void> => {
-    if (!activePlan) return;
-    const slot = activePlan.slots.find((s) => s.id === slotId);
-    if (!slot) return;
+  const isSlotCooked = (slot: MealSlot): boolean => {
+    if (!slot.recipeId) return false;
 
-    await persistPlan({
-      ...activePlan,
-      slots: activePlan.slots.map((s) =>
-        s.id === slotId ? { ...s, status: "cooked" as const } : s,
-      ),
+    return cookLogRepo.getCookLogs(slot.recipeId).some((cook) => {
+      if (cook.recipeId !== slot.recipeId) return false;
+      const cookedAt = new Date(cook.cookedAt);
+      if (Number.isNaN(cookedAt.getTime())) return false;
+
+      const localDate = [
+        cookedAt.getFullYear(),
+        String(cookedAt.getMonth() + 1).padStart(2, "0"),
+        String(cookedAt.getDate()).padStart(2, "0"),
+      ].join("-");
+      return localDate === slot.date;
     });
-
-    if (slot.recipeId) {
-      cookLogRepo.recordCook({ recipeId: slot.recipeId });
-    }
   };
 
   // ─── P3.2 Tier-1 qualitative adaptation ─────────────────────────────────
@@ -291,6 +295,81 @@ export const useMealPlanController = () => {
     }
   };
 
+  const requestSlotVariant = async (slotId: string): Promise<void> => {
+    if (!activePlan || !profile) return;
+    const slot = activePlan.slots.find((candidate) => candidate.id === slotId);
+    if (!slot?.recipeId || !slot.note) return;
+
+    setPendingSlotVariant(null);
+    setLoading(true);
+    try {
+      const parent = await recipeRepo.fetchById(slot.recipeId);
+      if (!parent) return;
+
+      const response = await LLMService.send({
+        system: buildSystemPrompt(profile),
+        messages: [
+          {
+            role: "user",
+            content: buildAdaptationPrompt({ recipe: parent, reason: slot.note }),
+          },
+        ],
+      });
+      const start = response.content.indexOf("{");
+      const end = response.content.lastIndexOf("}");
+      if (start === -1 || end <= start) return;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(response.content.slice(start, end + 1));
+      } catch {
+        return;
+      }
+
+      const validated = AdaptationResponseSchema.safeParse(parsed);
+      if (!validated.success) return;
+
+      setPendingSlotVariant({
+        slotId,
+        recipe: AdaptationService.buildVariantRecipe(parent, validated.data),
+      });
+    } catch (variantError) {
+      log.error("Could not prepare planned recipe variant", variantError);
+      setError("Could not prepare the variant.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const acceptSlotVariant = async (): Promise<void> => {
+    if (!activePlan || !pendingSlotVariant) return;
+    const proposal = pendingSlotVariant;
+
+    try {
+      await recipeRepo.save(proposal.recipe);
+      await persistPlan({
+        ...activePlan,
+        slots: activePlan.slots.map((slot) =>
+          slot.id === proposal.slotId
+            ? {
+                ...slot,
+                recipeId: proposal.recipe.id,
+                note: undefined,
+              }
+            : slot,
+        ),
+      });
+      setPendingSlotVariant(null);
+    } catch (variantError) {
+      log.error("Could not save planned recipe variant", variantError);
+      setError("Could not save the variant.");
+    }
+  };
+
+  const cancelSlotVariant = (): void => {
+    setPendingSlotVariant(null);
+  };
+
   // ─── P2.1 Recipe typeahead ───────────────────────────────────────────────
 
   // Fuzzy-filters saved recipes by title for the typeahead dropdown.
@@ -312,44 +391,43 @@ export const useMealPlanController = () => {
   const parseSlotInput = (
     input: SlotInput,
   ): {
+    text?: string;
     recipeId?: string;
     note?: string;
     servings?: number;
     adaptationIntents: string[];
   } => {
-    let titleCandidate: string;
     let contextText: string;
+    let recipeId: string | undefined;
+    let note: string | undefined;
+    let text: string | undefined;
 
     if ("rawText" in input) {
-      titleCandidate = input.rawText.trim();
+      const titleCandidate = input.rawText.trim();
       contextText = input.rawText;
-    } else {
-      titleCandidate = input.chipTitle.trim();
-      contextText = input.note.trim();
-    }
+      const matched = matchRecipe(titleCandidate);
 
-    const matched = matchRecipe(titleCandidate);
-    const recipeId = matched?.id;
-
-    // For rawText path: strip the matched recipe title prefix to get the note.
-    let noteText = contextText;
-    if (recipeId && "rawText" in input && matched) {
-      const titleLower = matched.title.toLowerCase();
-      const rawLower = input.rawText.toLowerCase();
-      if (rawLower.startsWith(titleLower)) {
-        noteText = input.rawText.slice(matched.title.length).trim();
+      if (matched) {
+        recipeId = matched.id;
+        const titleLower = matched.title.toLowerCase();
+        const rawLower = input.rawText.toLowerCase();
+        const noteText = rawLower.startsWith(titleLower)
+          ? input.rawText.slice(matched.title.length).trim()
+          : "";
+        note = noteText || undefined;
+      } else {
+        text = titleCandidate || undefined;
       }
+    } else {
+      recipeId = input.recipeId;
+      contextText = input.note.trim();
+      note = contextText || undefined;
     }
 
     const servings = extractServings(contextText);
     const adaptationIntents = extractAdaptationIntents(contextText);
 
-    // No recipe match → whole input is the note.
-    const note = recipeId
-      ? (noteText || undefined)
-      : (titleCandidate || undefined);
-
-    return { recipeId, note, servings, adaptationIntents };
+    return { text, recipeId, note, servings, adaptationIntents };
   };
 
   // Parses, creates the persisted MealSlot, and queues any qualitative
@@ -362,7 +440,7 @@ export const useMealPlanController = () => {
     if (!activePlan) return;
 
     const parsed = parseSlotInput(input);
-    if (!parsed.recipeId && !parsed.note) {
+    if (!parsed.recipeId && !parsed.text) {
       log.warn("submitSlotInput: nothing to persist after parsing", { date, type });
       return;
     }
@@ -378,6 +456,7 @@ export const useMealPlanController = () => {
       id: slotId,
       date,
       type,
+      text: parsed.text,
       recipeId: parsed.recipeId ?? null,
       note: parsed.note,
       servings: parsed.servings,
@@ -393,6 +472,40 @@ export const useMealPlanController = () => {
         (desc) => ({ slotId, kind: "qualitative" as const, description: desc }),
       );
       setPendingActions([...pendingActions, ...newActions]);
+    }
+  };
+
+  const createRecipeForSlot = async (slotId: string): Promise<void> => {
+    if (!activePlan || !profile) return;
+    const slot = activePlan.slots.find((candidate) => candidate.id === slotId);
+    if (!slot?.text || slot.recipeId) return;
+
+    setConvertingSlotId(slotId);
+    try {
+      const generated = await RecipeImportService.generateRecipeFromIdea(
+        slot.text,
+        profile,
+      );
+      if (!generated) return;
+
+      await recipeRepo.save(generated);
+      await persistPlan({
+        ...activePlan,
+        slots: activePlan.slots.map((candidate) =>
+          candidate.id === slotId
+            ? {
+                ...candidate,
+                text: undefined,
+                recipeId: generated.id,
+              }
+            : candidate,
+        ),
+      });
+    } catch (conversionError) {
+      log.error("Could not create recipe for planned text", conversionError);
+      setError("Could not create recipe right now.");
+    } finally {
+      setConvertingSlotId(null);
     }
   };
 
@@ -575,9 +688,25 @@ export const useMealPlanController = () => {
     setLoading(true);
     try {
       const today = todayKey();
-      const days = eachPlanDay(activePlan.weekStartDate, activePlan.dayCount)
+      const filledDates = new Set(activePlan.slots.map((slot) => slot.date));
+      const availableDays = eachPlanDay(activePlan.weekStartDate, activePlan.dayCount)
         .filter((d) => d >= today)
-        .map((date) => ({ date, label: formatDayLabel(date) }));
+        .filter((date) => !filledDates.has(date))
+        .map((date) => ({
+          date,
+          label: new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+            weekday: "long",
+          }),
+        }));
+      const filledSlots = activePlan.slots.map((slot) => ({
+        date: slot.date,
+        type: slot.type,
+        text:
+          slot.text ??
+          savedRecipes.find((recipe) => recipe.id === slot.recipeId)?.title ??
+          slot.note ??
+          "Planned meal",
+      }));
 
       let pantryHighlights: string[] | undefined;
       if (usePantry) {
@@ -589,20 +718,24 @@ export const useMealPlanController = () => {
 
       const message = buildPlanDraftUserMessage({
         request: request.trim(),
-        days,
+        availableDays,
+        filledSlots,
         month: new Date().getMonth() + 1,
         region: profile?.region ?? null,
         cuisinePreferences: profile?.preferences.cuisinePreferences ?? [],
         skillLevel: profile?.skillLevel ?? null,
         pantryHighlights,
       });
+      const eligibleDates = (
+        JSON.parse(message) as { availableDays: Array<{ date: string }> }
+      ).availableDays.map((day) => day.date);
 
       const response = await LLMService.send({
         system: PLAN_DRAFT_SYSTEM_PROMPT,
         messages: [{ role: "user", content: message }],
       });
 
-      const drafted = parsePlanDraft(response.content);
+      const drafted = parsePlanDraft(response.content, eligibleDates);
 
       const newSuggestions: SuggestionSlot[] = drafted.map((slot) => ({
         id: `suggestion-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -689,6 +822,8 @@ export const useMealPlanController = () => {
     defaultPlanLength,
     loading,
     error,
+    convertingSlotId,
+    pendingSlotVariant,
     createPlan,
     loadPlanForWeek,
     savePlan,
@@ -696,6 +831,10 @@ export const useMealPlanController = () => {
     searchRecipes,
     parseSlotInput,
     submitSlotInput,
+    createRecipeForSlot,
+    requestSlotVariant,
+    acceptSlotVariant,
+    cancelSlotVariant,
     addSuggestionSlot,
     removeSuggestionSlot,
     acceptSuggestion,
@@ -709,7 +848,7 @@ export const useMealPlanController = () => {
     deriveShoppingList,
     toggleShoppingItem,
     generateFromRequest,
-    markSlotCooked,
+    isSlotCooked,
     applyPendingAdaptation,
     savePreset,
     deletePreset,

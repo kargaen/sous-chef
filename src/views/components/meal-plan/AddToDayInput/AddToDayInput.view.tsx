@@ -46,7 +46,7 @@ export function AddToDayInput({
   const [mealType, setMealType] = useState<MealSlotType>(defaultType);
   const [textValue, setTextValue] = useState("");
   const [noteValue, setNoteValue] = useState("");
-  const [chipTitle, setChipTitle] = useState<string | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<Pick<Recipe, "id" | "title"> | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const textRef = useRef<TextInput>(null);
   const noteRef = useRef<TextInput>(null);
@@ -61,7 +61,7 @@ export function AddToDayInput({
   const cycleType = () => setMealType(nextType(mealType));
 
   const selectRecipe = (recipe: Recipe) => {
-    setChipTitle(recipe.title);
+    setSelectedRecipe({ id: recipe.id, title: recipe.title });
     setTextValue("");
     setShowDropdown(false);
     setMode("chip");
@@ -69,22 +69,25 @@ export function AddToDayInput({
   };
 
   const clearChip = () => {
-    setChipTitle(null);
+    setSelectedRecipe(null);
     setNoteValue("");
     setMode("text");
     setTimeout(() => textRef.current?.focus(), 50);
   };
 
   const handleSubmit = () => {
-    if (mode === "chip" && chipTitle != null) {
-      onSubmit(mealType, { chipTitle, note: noteValue.trim() });
+    if (mode === "chip" && selectedRecipe != null) {
+      onSubmit(mealType, {
+        recipeId: selectedRecipe.id,
+        note: noteValue.trim(),
+      });
     } else if (textValue.trim()) {
       onSubmit(mealType, { rawText: textValue.trim() });
     }
     setMode("idle");
     setTextValue("");
     setNoteValue("");
-    setChipTitle(null);
+    setSelectedRecipe(null);
     setShowDropdown(false);
   };
 
@@ -126,13 +129,13 @@ export function AddToDayInput({
 
   // ── Chip mode ────────────────────────────────────────────────────────────
 
-  if (mode === "chip" && chipTitle != null) {
+  if (mode === "chip" && selectedRecipe != null) {
     return (
       <View style={styles.container}>
         <TypePill />
         <View style={styles.chipRow}>
           <View style={styles.chip}>
-            <Text style={styles.chipText}>{chipTitle}</Text>
+            <Text style={styles.chipText}>{selectedRecipe.title}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Clear recipe selection"
