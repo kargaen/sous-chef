@@ -2,6 +2,7 @@
 
 **Status:** draft
 **Created:** 2026-07-17
+**Revised:** 2026-07-26 (baseline efe3197) — narrowed to plain-text sharing: recipe = ingredients + steps; shopping list = only the ticked "basket" items.
 **Architecture baseline:** 078988c
 **Source:** Jot task “deling a opskrift og andre relevante ting som indkøbslister” — share a recipe and other relevant things such as shopping lists.
 
@@ -12,27 +13,28 @@
 ### Flow 1: Share a recipe from its recipe surface
 
 ```gherkin
-Given the cook is viewing a saved recipe
+Given the cook is viewing a saved recipe on the recipe detail surface
 When they choose to share it
-Then the app opens the native share sheet with the recipe title, ingredients, steps, and a Sous Chef attribution
+Then the app opens the native share sheet with plain text containing the recipe title, its ingredient list, its numbered steps, and one warm Sous Chef attribution line
+And no internal ids appear in the shared text
 And sharing does not edit the recipe, cook log, pantry, or meal plan
 ```
 
-### Flow 2: Share a shopping list from the shopping-list surface
+### Flow 2: Share the ticked "basket" from the shopping-list surface
 
 ```gherkin
-Given the cook has a generated shopping list for a selected scope
+Given the cook has a generated shopping list for a selected scope with one or more items ticked off
 When they choose to share it
-Then the app opens the native share sheet with grouped shopping-list sections and quantities
-And checked items remain visibly marked in the shared text
+Then the app opens the native share sheet with plain text containing only the ticked items — the "basket" — grouped by store section, each with its quantity and unit
+And unticked items do not appear in the shared text
 ```
 
-### Flow 3: Share a future relevant kitchen artefact through the same formatter boundary
+### Flow 3: Sharing is unavailable when the basket is empty
 
 ```gherkin
-Given the app later exposes another shareable kitchen artefact
-When that artefact is routed through the sharing formatter boundary
-Then its shared text is deterministic, product-worded, and tested without requiring the native share sheet
+Given the cook has a generated shopping list but nothing is ticked off
+When they look at the shopping-list surface
+Then no share action is offered, because there is nothing in the basket to share
 ```
 
 **Out of scope for this epic:**
@@ -49,13 +51,13 @@ Then its shared text is deterministic, product-worded, and tested without requir
 function formatRecipeShareText(recipe: Recipe): string;
 ```
 
-Returns deterministic, user-facing text for native sharing. It should include enough recipe detail to cook from the shared message without exposing internal ids.
+Returns deterministic, plain-text recipe content for native sharing: title, ingredient list, numbered steps, and one warm attribution line. Includes enough detail to cook from the shared message and exposes no internal ids.
 
 ```ts
 function formatShoppingListShareText(groups: ListGroup[]): string;
 ```
 
-Returns deterministic, grouped shopping-list text. The current shopping list screen already builds share text inline; this signature creates a reusable formatter boundary before adding more share surfaces.
+Returns deterministic, plain-text shopping-list content built from **only the ticked items** in `groups` — the "basket" — grouped by store section with each item's quantity and unit. Unticked items are dropped by the formatter itself so the "basket only" rule is pinned by a formatter test rather than by the caller. The current shopping-list screen builds this text inline (over all items, with a ✓ marker); this signature extracts a reusable, testable boundary and changes the output to basket-only.
 
 ```ts
 function shareText(message: string, title: string): Promise<void>;
@@ -73,10 +75,10 @@ How the flows in §1 become failing tests, and what each function call is measur
 
 | Flow | Function call | Authority | Fixture | Tolerance |
 |---|---|---|---|---|
-| 1 | `formatRecipeShareText` | Existing `Recipe` type and rendered recipe detail content | `src/models/types/Recipe.types.ts`; recipe detail screen using the selected recipe | Exact text sections for title, ingredients, steps, and attribution; no ids |
-| 2 | `formatShoppingListShareText` | Existing inline share formatting in `ShoppingListScreen` | `src/views/screens/ShoppingListScreen.tsx`; `src/models/types/ShoppingList.types.ts` | Existing grouped section order and quantity formatting preserved |
+| 1 | `formatRecipeShareText` | Existing `Recipe` type and the ingredient/step content rendered on the recipe detail screen | `src/models/types/Recipe.types.ts`; `src/views/screens/RecipeScreen.tsx` | Exact text: title, each ingredient (`quantity unit name`), each numbered step, one attribution line; no `id` fields |
+| 2 | `formatShoppingListShareText` | Legacy parity with the inline `handleShare` grouping/quantity formatting in `ShoppingListScreen`, with the deliberate change that only `checked` items appear and the `✓` marker is dropped | `src/views/screens/ShoppingListScreen.tsx` (lines 80–96); `src/models/types/ShoppingList.types.ts` | Grouped section order and quantity/unit formatting preserved from the legacy inline output; input rows with `checked: false` produce no output line; sections whose items are all unticked produce no header |
 | 1, 2 | `shareText` | React Native `Share.share` API already used by the shopping-list screen | `src/views/screens/ShoppingListScreen.tsx` | Called once with expected title/message; native share result not asserted |
-| 3 | Formatter boundary | Architecture rule that views stay presentation-only and side effects sit below controllers/services | `architecture/constitution/03-data-flow.md`; `architecture/constitution/07-key-conventions.md` | Future shareables add formatter tests before view buttons |
+| 3 | Share-action visibility gate | The screen offers no share control when the ticked-item count is zero | `src/views/screens/ShoppingListScreen.tsx` | With a list where every item has `checked: false`, no element with the "Share shopping list" accessibility label renders |
 
 ### What is deliberately not tested
 
@@ -89,11 +91,12 @@ How the flows in §1 become failing tests, and what each function call is measur
 
 ## 4. Checklist
 
-- [ ] 1. Add failing formatter tests in `src/utils/shareFormatters.test.ts` for recipe and shopping-list text — done when the expected text is pinned without invoking React Native `Share`.
-- [ ] 2. Add `src/utils/shareFormatters.ts` — done when item 1 passes and the formatter exports contain no native side effects.
-- [ ] 3. Refactor `src/views/screens/ShoppingListScreen.tsx` to use `formatShoppingListShareText` — done when current shopping-list sharing output is unchanged.
-- [ ] 4. Add a recipe share action to the recipe detail surface — done when a saved recipe can open the native share sheet with `formatRecipeShareText` output and no recipe data is mutated.
+- [ ] 1. Add failing formatter tests in `src/utils/shareFormatters.test.ts` — done when the expected recipe text (title, ingredients, numbered steps, attribution, no ids) and the expected basket-only shopping-list text (only `checked` items, grouped, with quantity/unit, no `✓` marker) are both pinned without invoking React Native `Share`.
+- [ ] 2. Add `src/utils/shareFormatters.ts` with `formatRecipeShareText` and `formatShoppingListShareText` — done when item 1 passes and the formatter exports contain no native side effects.
+- [ ] 3. Refactor `src/views/screens/ShoppingListScreen.tsx` to build its share text from `formatShoppingListShareText` — done when the shared text contains only the ticked "basket" items and the inline formatting is removed.
+- [ ] 4. Add a recipe share action to the recipe detail surface `src/views/screens/RecipeScreen.tsx` — done when a saved recipe can open the native share sheet with `formatRecipeShareText` output and no recipe data is mutated.
 - [ ] 5. Add a thin sharing boundary if needed by the view/controller split — done when native `Share.share` mocking is isolated from formatter tests and the call site remains small.
+- [ ] 6. (added 2026-07-26) Gate the shopping-list share action on the ticked-item count in `src/views/screens/ShoppingListScreen.tsx` — done when no share control renders while nothing is ticked (Flow 3).
 
 ---
 
@@ -117,9 +120,10 @@ No. Sharing exports the cook’s kitchen artefacts without adding a generic soci
 
 | # | Question | Blocks | Decision needed by |
 |---|---|---|---|
-| Q1 | Should shared recipe text be plain text only, or include a lightweight Sous Chef header/footer? | Item 1 | Before formatter implementation; recommended: plain text with one warm attribution line. |
-| Q2 | Which recipe surface gets the first share button: recipe detail, cook mode, or cookbook card? | Item 4 | Before view implementation; recommended: recipe detail first. |
-| Q3 | Should shopping-list checked items be included, omitted, or marked? | Item 1 | Before formatter implementation; recommended: preserve the current checked marker. |
+| Q1 | Plain text vs. a Sous Chef header/footer for the recipe share? | — | **Resolved 2026-07-26:** plain text with one warm attribution line. |
+| Q2 | Which recipe surface gets the share button? | — | **Resolved 2026-07-26:** recipe detail (`RecipeScreen.tsx`) first. |
+| Q3 | For the shopping list — include, omit, or mark checked items? | — | **Resolved 2026-07-26:** share only the ticked "basket" items (with quantities); drop the redundant `✓` marker; hide the action when nothing is ticked. |
+| Q4 | Keep grouping the shared basket by store section, or flat list? | — | **Resolved 2026-07-26:** keep the existing store-section grouping (sections with no ticked items are omitted). Revisit only if a flat list is requested. |
 
 ### New capability
 
