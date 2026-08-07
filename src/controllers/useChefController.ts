@@ -1,3 +1,4 @@
+import * as Crypto from "expo-crypto";
 import { useState } from "react";
 import { ChefProfileRepository } from "../models/repositories/ChefProfileRepository";
 import { ChefProfileSchema } from "../models/schemas/ChefProfileSchema";
@@ -74,7 +75,7 @@ export const useChefController = () => {
     try {
       const currentProfile = (await repo.get()) ?? profile;
       const nextProfile = ChefProfileSchema.parse({
-        id: currentProfile?.id ?? `chef_${Date.now()}`,
+        id: currentProfile?.id ?? Crypto.randomUUID(),
         name: input.name.trim(),
         skillLevel: input.skillLevel,
         preferences: {

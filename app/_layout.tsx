@@ -90,9 +90,16 @@ export default function RootLayout() {
         useAuthStore.getState().setSession(session);
 
         if (session) {
-          void BackupService.restoreFromRemote().catch((error) => {
+          try {
+            await BackupService.restoreFromRemote();
+            const syncedSettings = await new SettingsRepository().get();
+
+            if (active) {
+              setSettings(syncedSettings);
+            }
+          } catch (error) {
             log.info("Startup database sync skipped", error);
-          });
+          }
         }
       } catch (error) {
         log.info("Session restore skipped", error);
@@ -103,7 +110,7 @@ export default function RootLayout() {
       active = false;
       subscription?.unsubscribe();
     };
-  }, [dbReady]);
+  }, [dbReady, setSettings]);
 
   useEffect(() => {
     if (!settings) {

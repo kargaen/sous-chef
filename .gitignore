@@ -37,6 +37,9 @@ yarn-error.*
 .env.test.local
 .env.production.local
 
+# Claude Code local/personal settings (MCP approvals, etc.) — not shared
+.claude/settings.local.json
+
 # typescript
 *.tsbuildinfo
 
