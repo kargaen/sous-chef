@@ -25,10 +25,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Pinned, not @latest: CLI 2.112.0 broke `link` with
+      # "failed to get api keys: SchemaError" — its response validation rejects
+      # the inserted_at timestamp the platform returns. 2.111.0 is the last
+      # version verified green against this project (run 30705877990, 2026-08-01).
+      # Bump deliberately and watch the migrate-db job; it gates the APK build.
       - name: Apply Supabase migrations
         run: |
-          npx supabase@latest link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
-          npx supabase@latest db push --linked --yes --include-all
+          npx supabase@2.111.0 link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+          npx supabase@2.111.0 db push --linked --yes --include-all
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
