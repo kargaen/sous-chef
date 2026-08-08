@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import { useRecipeController, useRegisterAssistantContext } from "@/controllers";
+import type { VariantDisposition } from "@/controllers/useRecipeController";
 import type { RecipeCookStats } from "@/models/repositories";
 import type { Recipe, SuggestionContext } from "@/models/types";
 
@@ -39,6 +40,7 @@ export const useRecipeScreenView = () => {
     fetchById,
     getVariants,
     promoteVariant,
+    deleteRecipe,
     getRecipeStats,
     activeRecipe,
     loading,
@@ -105,6 +107,26 @@ export const useRecipeScreenView = () => {
     setSelectedPageIndex(0);
     const refreshed = await getVariantsRef.current(mainRecipe.id);
     setVariants(refreshed);
+  };
+
+  // Deleting the recipe the pager is showing. A variant deletes on its own and
+  // leaves the cook on the original; deleting the original takes the whole page
+  // away, which is why the caller navigates on a true result.
+  const handleDelete = async (
+    variantDisposition?: VariantDisposition,
+  ): Promise<boolean> => {
+    if (!recipe || !mainRecipe) return false;
+
+    const deletingVariant = activePage?.isVariant ?? false;
+    const deleted = await deleteRecipe(recipe.id, variantDisposition);
+    if (!deleted) return false;
+
+    if (deletingVariant) {
+      setSelectedPageIndex(0);
+      setVariants(await getVariantsRef.current(mainRecipe.id));
+    }
+
+    return true;
   };
 
   const assistantContext: SuggestionContext | null = recipe
@@ -181,6 +203,7 @@ export const useRecipeScreenView = () => {
 
   return {
     activePage,
+    handleDelete,
     handlePromote,
     pages,
     recipe,
@@ -188,5 +211,6 @@ export const useRecipeScreenView = () => {
     selectPage: setSelectedPageIndex,
     stats: statsView,
     statusType: "ready" as const,
+    variantCount: variants.length,
   };
 };

@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useRef } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +15,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { colors, spacing } from "@/constants";
+import type { VariantDisposition } from "@/controllers/useRecipeController";
 import { Button } from "@/views/components/ui";
 import { useSafeBack } from "@/views/hooks/useSafeBack";
 import { screenStyles, textStyles } from "@/views/styles";
@@ -66,8 +68,17 @@ export default function RecipeScreen() {
     );
   }
 
-  const { activePage, handlePromote, pages, recipe, selectedPageIndex, selectPage, stats } =
-    view;
+  const {
+    activePage,
+    handleDelete,
+    handlePromote,
+    pages,
+    recipe,
+    selectedPageIndex,
+    selectPage,
+    stats,
+    variantCount,
+  } = view;
 
   const hasVariants = pages.length > 1;
   // Horizontal padding of the content container is spacing.lg on each side.
@@ -84,6 +95,73 @@ export default function RecipeScreen() {
   const backdropLocations = recipe.imageUri
     ? ([0, 0.45, 1] as const)
     : ([0, 1] as const);
+
+  const runDelete = async (
+    variantDisposition?: VariantDisposition,
+  ): Promise<void> => {
+    const wasVariant = activePage.isVariant;
+    const deleted = await handleDelete(variantDisposition);
+    // A deleted variant leaves the original on screen; a deleted original takes
+    // the whole page with it, so there is nothing left here to come back to.
+    if (deleted && !wasVariant) goBack();
+  };
+
+  const confirmDelete = (): void => {
+    if (activePage.isVariant) {
+      Alert.alert(
+        "Delete this variant?",
+        `"${activePage.recipe.title}" will leave your shelf for good. The original stays right where it is.`,
+        [
+          { text: "Keep it", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => void runDelete(),
+          },
+        ],
+      );
+      return;
+    }
+
+    if (variantCount > 0) {
+      Alert.alert(
+        "Delete this recipe?",
+        `"${recipe.title}" has ${variantCount} ${
+          variantCount === 1 ? "variant" : "variants"
+        } tucked behind it. Shall I keep ${
+          variantCount === 1 ? "it" : "them"
+        } as ${
+          variantCount === 1 ? "a recipe" : "recipes"
+        } of their own, or clear the whole lot out? There's no getting them back.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: variantCount === 1 ? "Keep the variant" : "Keep the variants",
+            onPress: () => void runDelete("keep"),
+          },
+          {
+            text: "Delete everything",
+            style: "destructive",
+            onPress: () => void runDelete("delete"),
+          },
+        ],
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Delete this recipe?",
+      `"${recipe.title}" will leave your shelf for good — there's no getting it back.`,
+      [
+        { text: "Keep it", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => void runDelete(),
+        },
+      ],
+    );
+  };
 
   const renderHeroCard = (page: RecipePage) => (
     <View
@@ -148,6 +226,11 @@ export default function RecipeScreen() {
             }}
           />
         ) : null}
+        <Button
+          label={page.isVariant ? "Delete variant" : "Delete recipe"}
+          variant="danger"
+          onPress={confirmDelete}
+        />
       </View>
     </View>
   );
