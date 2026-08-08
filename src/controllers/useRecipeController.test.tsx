@@ -21,8 +21,11 @@ jest.mock("../models/repositories/CookLogRepository", () => {
 
 jest.mock("../models/repositories/RecipeRepository", () => {
   const mockRecipeRepository = {
+    delete: jest.fn(),
     fetchById: jest.fn(),
     getSaved: jest.fn(),
+    getVariants: jest.fn(),
+    promoteVariant: jest.fn(),
     save: jest.fn(),
     search: jest.fn(),
   };
@@ -116,10 +119,16 @@ const makeProfile = () => ({
 describe("useRecipeController", () => {
   beforeEach(() => {
     mockCurrentProfile = makeProfile();
+    mockRecipeRepository.delete.mockReset();
     mockRecipeRepository.fetchById.mockReset();
     mockRecipeRepository.getSaved.mockReset();
+    mockRecipeRepository.getVariants.mockReset();
+    mockRecipeRepository.promoteVariant.mockReset();
     mockRecipeRepository.save.mockReset();
     mockRecipeRepository.search.mockReset();
+    mockRecipeRepository.delete.mockResolvedValue(undefined);
+    mockRecipeRepository.getVariants.mockResolvedValue([]);
+    mockRecipeRepository.promoteVariant.mockResolvedValue(null);
     mockCookLogRepository.getRatingCategories.mockReset();
     mockCookLogRepository.getRecipeStats.mockReset();
     mockCookLogRepository.saveRatingCategories.mockReset();
@@ -392,5 +401,124 @@ describe("useRecipeController", () => {
     expect(result.current.error).toBe(
       "Sous Chef could not import that recipe right now.",
     );
+  });
+
+  describe("deleteRecipe", () => {
+    const makeRecipe = (id: string, parentId: string | null = null) => ({
+      id,
+      title: `Recipe ${id}`,
+      description: "",
+      parentId,
+      servings: 2,
+      prepMinutes: 5,
+      cookMinutes: 10,
+      ingredients: [],
+      steps: [],
+      tags: [],
+      createdDate: "2026-05-08T10:00:00.000Z",
+      lastUpdatedDate: "2026-05-08T10:00:00.000Z",
+    });
+
+    it("deletes a recipe that has no variants", async () => {
+      const { result } = renderHook(() => useRecipeController());
+
+      let deleted;
+      await act(async () => {
+        deleted = await result.current.deleteRecipe("recipe-1");
+      });
+
+      expect(mockRecipeRepository.delete).toHaveBeenCalledTimes(1);
+      expect(mockRecipeRepository.delete).toHaveBeenCalledWith("recipe-1");
+      expect(mockRecipeRepository.promoteVariant).not.toHaveBeenCalled();
+      expect(deleted).toBe(true);
+      expect(result.current.error).toBeNull();
+    });
+
+    it("reports failure without clearing loading when the delete throws", async () => {
+      mockRecipeRepository.delete.mockRejectedValue(new Error("db locked"));
+      const { result } = renderHook(() => useRecipeController());
+
+      let deleted;
+      await act(async () => {
+        deleted = await result.current.deleteRecipe("recipe-1");
+      });
+
+      expect(deleted).toBe(false);
+      expect(result.current.error).toBe("Could not delete recipe.");
+      expect(result.current.loading).toBe(false);
+    });
+
+    it("promotes every variant before deleting the parent when variants are kept", async () => {
+      mockRecipeRepository.getVariants.mockResolvedValue([
+        makeRecipe("variant-1", "recipe-1"),
+        makeRecipe("variant-2", "recipe-1"),
+      ]);
+      const { result } = renderHook(() => useRecipeController());
+
+      await act(async () => {
+        await result.current.deleteRecipe("recipe-1", "keep");
+      });
+
+      expect(mockRecipeRepository.promoteVariant).toHaveBeenCalledTimes(2);
+      expect(mockRecipeRepository.promoteVariant).toHaveBeenCalledWith("variant-1");
+      expect(mockRecipeRepository.promoteVariant).toHaveBeenCalledWith("variant-2");
+      expect(mockRecipeRepository.delete).toHaveBeenCalledTimes(1);
+      expect(mockRecipeRepository.delete).toHaveBeenCalledWith("recipe-1");
+
+      // Promotion must complete before the parent row goes, so an interrupted
+      // delete can never strand a variant pointing at a missing parent.
+      const lastPromoteOrder = Math.max(
+        ...mockRecipeRepository.promoteVariant.mock.invocationCallOrder,
+      );
+      expect(lastPromoteOrder).toBeLessThan(
+        mockRecipeRepository.delete.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("deletes every variant alongside the parent when variants are discarded", async () => {
+      mockRecipeRepository.getVariants.mockResolvedValue([
+        makeRecipe("variant-1", "recipe-1"),
+        makeRecipe("variant-2", "recipe-1"),
+      ]);
+      const { result } = renderHook(() => useRecipeController());
+
+      await act(async () => {
+        await result.current.deleteRecipe("recipe-1", "delete");
+      });
+
+      expect(mockRecipeRepository.delete).toHaveBeenCalledTimes(3);
+      expect(mockRecipeRepository.delete).toHaveBeenCalledWith("variant-1");
+      expect(mockRecipeRepository.delete).toHaveBeenCalledWith("variant-2");
+      expect(mockRecipeRepository.delete).toHaveBeenCalledWith("recipe-1");
+      expect(mockRecipeRepository.promoteVariant).not.toHaveBeenCalled();
+    });
+
+    it("deletes only the variant when a variant is the target", async () => {
+      const { result } = renderHook(() => useRecipeController());
+
+      await act(async () => {
+        await result.current.deleteRecipe("variant-1");
+      });
+
+      expect(mockRecipeRepository.delete).toHaveBeenCalledTimes(1);
+      expect(mockRecipeRepository.delete).toHaveBeenCalledWith("variant-1");
+      expect(mockRecipeRepository.delete).not.toHaveBeenCalledWith("recipe-1");
+    });
+
+    it("clears the active recipe once it has been deleted", async () => {
+      mockRecipeRepository.fetchById.mockResolvedValue(makeRecipe("recipe-1"));
+      const { result } = renderHook(() => useRecipeController());
+
+      await act(async () => {
+        await result.current.fetchById("recipe-1");
+      });
+      expect(result.current.activeRecipe).not.toBeNull();
+
+      await act(async () => {
+        await result.current.deleteRecipe("recipe-1");
+      });
+
+      expect(result.current.activeRecipe).toBeNull();
+    });
   });
 });

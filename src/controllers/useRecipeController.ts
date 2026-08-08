@@ -35,6 +35,12 @@ interface ImportRecipeSourceInput {
   source: string;
 }
 
+// What happens to a recipe's variants when the recipe itself is deleted. The
+// cook is asked, because only they know whether an adapted version was the
+// keeper — variants are hidden from listings, so an undecided delete would
+// strand them on disk with no way back to them.
+export type VariantDisposition = "keep" | "delete";
+
 // Manual edits from the Edit Recipe form — no LLM, just the fields the user
 // can change by hand. Photo is handled separately by the photo controller.
 interface RecipeEditsInput {
@@ -244,6 +250,48 @@ export const useRecipeController = () => {
     }
   };
 
+  // Deletion is permanent — the recipes table has no tombstone — so the caller
+  // is expected to have confirmed with the cook first. Returns whether the
+  // recipe was removed, so the view knows when it is safe to navigate away.
+  const deleteRecipe = async (
+    id: string,
+    variantDisposition?: VariantDisposition,
+  ): Promise<boolean> => {
+    log.info("Deleting recipe", { id, variantDisposition });
+    setLoading(true);
+    setError(null);
+    try {
+      const variants = await repo.getVariants(id);
+
+      if (variants.length > 0) {
+        if (variantDisposition === "delete") {
+          for (const variant of variants) {
+            await repo.delete(variant.id);
+          }
+        } else {
+          // Promote before deleting the parent: interrupted here, the worst
+          // state is a standalone variant next to a still-present original,
+          // which the cook can see and act on. The reverse order would leave
+          // variants pointing at a recipe that no longer exists.
+          for (const variant of variants) {
+            await repo.promoteVariant(variant.id);
+          }
+        }
+      }
+
+      await repo.delete(id);
+      setActiveRecipe((current) => (current?.id === id ? null : current));
+      log.info("Recipe deleted", { id, variantsAffected: variants.length });
+      return true;
+    } catch (error) {
+      log.error("Could not delete recipe", error);
+      setError("Could not delete recipe.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getSaved = async (): Promise<Recipe[]> => {
     try {
       return await repo.getSaved();
@@ -427,6 +475,7 @@ Apply the requested change and return the full updated recipe.`,
     saveRecipe,
     saveRecipeEdits,
     saveDraftRecipe,
+    deleteRecipe,
     markCooked,
     getSaved,
     getVariants,
