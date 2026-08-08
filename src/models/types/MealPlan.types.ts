@@ -5,12 +5,13 @@ export interface MealSlot {
   id: string;
   date: string;          // YYYY-MM-DD
   type: MealSlotType;
+  text?: string;
   recipeId?: string | null;
   note?: string;
   servings?: number;
   status?: MealSlotStatus;
 }
-// Schema invariant: recipeId or note must be present on every persisted slot.
+// Schema invariant: text is standalone; note is only complementary to recipeId.
 
 // Transient UI state only — never reaches the repository.
 // Suggestion chips live here until the user accepts or rejects them.
@@ -33,7 +34,7 @@ export interface AdaptationIntent {
 // Unified slot submission contract — both input paths normalise to this shape.
 export type SlotInput =
   | { rawText: string }
-  | { chipTitle: string; note: string };
+  | { recipeId: string; note: string };
 
 export interface WeekPlan {
   id: string;

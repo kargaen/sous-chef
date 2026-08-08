@@ -3,6 +3,8 @@ name: Build & Release Android APK
 on:
   push:
     branches: [master]
+    tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   migrate-db:
@@ -14,10 +16,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Pinned to match rc-android.yml — see the note there. Keep the two in
+      # step: a release must never run a CLI version the RC path hasn't proven.
       - name: Apply Supabase migrations
         run: |
-          npx supabase@latest link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
-          npx supabase@latest db push --linked --yes --include-all
+          npx supabase@2.111.0 link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+          npx supabase@2.111.0 db push --linked --yes --include-all
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
@@ -27,11 +31,13 @@ jobs:
     # missing the migrations it assumes.
     needs: migrate-db
     runs-on: ubuntu-latest
-    # Cancel any in-flight build when a newer commit arrives on master.
+    # Cancel any in-flight build when a newer commit arrives. Per-ref group so
+    # tag builds don't cancel master builds. Concurrency lives on this job, not
+    # the workflow, so migrate-db always runs to completion.
     # Note: the EAS cloud build itself is not cancelled — only the GH Actions
     # runner is. EAS credits are consumed either way; keep pushes intentional.
     concurrency:
-      group: release-android
+      group: release-android-${{ github.ref }}
       cancel-in-progress: true
     permissions:
       contents: write
@@ -67,7 +73,7 @@ jobs:
             --profile preview \
             --non-interactive \
             --json \
-            2>/dev/null)
+            2>/tmp/eas-stderr.txt) || { echo "=== EAS error output ==="; cat /tmp/eas-stderr.txt; exit 1; }
           ARTIFACT_URL=$(echo "$BUILD_JSON" | jq -r '.[0].artifacts.buildUrl')
           echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
 
@@ -78,17 +84,32 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      # Creates a versioned GitHub Release and attaches the APK.
-      # Each push to main gets its own build-N release tag.
+      # The stable version is the -rc-stripped base of package.json, so a
+      # release cut while package.json still reads 1.0.2-rc.N tags v1.0.2, not
+      # v1.0.2-rc.N (EPIC-008 flow 3).
+      - name: Resolve stable version from package.json
+        id: version
+        run: |
+          FULL=$(node -p "require('./package.json').version")
+          echo "value=$(echo "$FULL" | sed 's/-rc.*//')" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: "Build #${{ github.run_number }} — ${{ steps.sha.outputs.short }}"
+          tag_name: v${{ steps.version.outputs.value }}
+          name: v${{ steps.version.outputs.value }} — ${{ steps.sha.outputs.short }}
           body: |
-            Automated Android build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
+            Android build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}).
 
             **Install:** download `sous-chef.apk` and open it on your Android device.
             You may need to allow installation from unknown sources in your device settings.
           files: sous-chef.apk
-          prerelease: true
+          prerelease: false
+
+      # The stable release supersedes its candidate: drop the matching
+      # v{base}-rc pre-release + tag so it can't be mistaken for current
+      # (EPIC-008 flow 3).
+      - name: Clean up the superseded RC release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete "v${{ steps.version.outputs.value }}-rc" --yes --cleanup-tag || true

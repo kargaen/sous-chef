@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { type ReactNode, useRef } from "react";
 import {
@@ -13,6 +14,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, spacing } from "@/constants";
+import { useSousChefCompanionStore } from "@/store/sousChefCompanionStore";
+import { useUIStore } from "@/store/uiStore";
+import { configureLogger } from "@/utils/logger";
 import { DiscoverFeed } from "@/views/components/discover";
 import type { DiscoverFeedHandle } from "@/views/components/discover";
 import {
@@ -40,6 +44,33 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const feed = useHomeFeed();
+
+  const enableDebugMode = useUIStore((s) => s.enableDebugMode);
+  const showCompanion = useSousChefCompanionStore((s) => s.showCompanion);
+
+  const markTapCount = useRef(0);
+  const markTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePressMark = () => {
+    if (markTapTimer.current) clearTimeout(markTapTimer.current);
+    markTapCount.current += 1;
+
+    if (markTapCount.current >= 6) {
+      markTapCount.current = 0;
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      enableDebugMode();
+      configureLogger({ minLevel: "debug" });
+      showCompanion("happy", "Debug mode activated. Head to settings to export the log.", {
+        label: "Open settings",
+        route: "/settings",
+      });
+      return;
+    }
+
+    markTapTimer.current = setTimeout(() => {
+      markTapCount.current = 0;
+    }, 1000);
+  };
 
   // Pull-to-load (G.2): the gesture lives here on the scroller; the action lives
   // in DiscoverFeed's controller, reached through its imperative handle.
@@ -121,7 +152,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <HomeBriefingHeader feed={feed} />
+        <HomeBriefingHeader feed={feed} onPressMark={handlePressMark} />
       </View>
 
       {feed.loading

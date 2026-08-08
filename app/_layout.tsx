@@ -1,5 +1,5 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { Stack } from "expo-router";
+import { Stack, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,12 +12,16 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { colors, spacing, typography } from "@/constants";
 import { SettingsRepository } from "@/models/repositories";
-import { StorageService } from "@/services";
+import { BackupService } from "@/services/BackupService";
+import { StorageService, SupabaseService } from "@/services";
+import { useAuthStore } from "@/store/authStore";
 import { useSettingsStore } from "@/store";
+import { createLogger } from "@/utils/logger";
 import { AssistantShell } from "@/views/components/assistant/AssistantShell";
 import { SousChefCompanionHost } from "@/views/components/companion";
 
 const ROOT_KEEP_AWAKE_TAG = "root-layout-keep-screen-on";
+const log = createLogger("RootLayout");
 
 // The chat launcher (AssistantShell) floats above the bottom of every screen.
 // On Stack screens there is no tab bar to sit beside, so reserve a clear strip
@@ -27,8 +31,13 @@ const LAUNCHER_BOTTOM_CLEARANCE = 88;
 
 export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
+  const segments = useSegments();
   const settings = useSettingsStore((state) => state.settings);
   const setSettings = useSettingsStore((state) => state.setSettings);
+
+  // Onboarding runs in its own clean shell — the floating chat launcher belongs
+  // to the standard app, not the intro flow.
+  const inOnboarding = segments[0] === "(onboarding)";
 
   useEffect(() => {
     let mounted = true;
@@ -55,6 +64,53 @@ export default function RootLayout() {
       mounted = false;
     };
   }, [setSettings]);
+
+  useEffect(() => {
+    if (!dbReady) {
+      return;
+    }
+
+    let active = true;
+    let subscription: ReturnType<typeof SupabaseService.onAuthStateChange> | null = null;
+
+    void (async () => {
+      try {
+        subscription = SupabaseService.onAuthStateChange((session) => {
+          if (active) {
+            useAuthStore.getState().setSession(session);
+          }
+        });
+
+        const session = await SupabaseService.getSession();
+
+        if (!active) {
+          return;
+        }
+
+        useAuthStore.getState().setSession(session);
+
+        if (session) {
+          try {
+            await BackupService.restoreFromRemote();
+            const syncedSettings = await new SettingsRepository().get();
+
+            if (active) {
+              setSettings(syncedSettings);
+            }
+          } catch (error) {
+            log.info("Startup database sync skipped", error);
+          }
+        }
+      } catch (error) {
+        log.info("Session restore skipped", error);
+      }
+    })();
+
+    return () => {
+      active = false;
+      subscription?.unsubscribe();
+    };
+  }, [dbReady, setSettings]);
 
   useEffect(() => {
     if (!settings) {
@@ -99,7 +155,7 @@ export default function RootLayout() {
         <Stack.Screen name="recipe/reflect" />
         <Stack.Screen name="recipe/edit" />
       </Stack>
-      <AssistantShell />
+      {!inOnboarding ? <AssistantShell /> : null}
       <SousChefCompanionHost />
     </>
   );

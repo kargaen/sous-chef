@@ -30,6 +30,8 @@ interface ButtonProps {
   leftAccessory?: ReactNode;
   rightAccessory?: ReactNode;
   style?: StyleProp<ViewStyle>;
+  // For buttons whose label is a glyph, which announces as nothing useful.
+  accessibilityLabel?: string;
 }
 
 export function Button({
@@ -42,12 +44,14 @@ export function Button({
   leftAccessory,
   rightAccessory,
   style,
+  accessibilityLabel,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
 
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
       onPress={onPress}

@@ -11,11 +11,13 @@ const LAUNCHER_TAB_BAR_RESERVE = 72;
 
 type FeatherName = ComponentProps<typeof Feather>["name"];
 
-const tabIcon =
-  (name: FeatherName) =>
-  ({ color, size }: { color: string; size: number }) => (
-    <Feather name={name} size={size} color={color} />
-  );
+const tabIcon = (name: FeatherName) => {
+  function TabBarIcon({ color, size }: { color: string; size: number }) {
+    return <Feather name={name} size={size} color={color} />;
+  }
+
+  return TabBarIcon;
+};
 
 export default function TabsLayout() {
   return (

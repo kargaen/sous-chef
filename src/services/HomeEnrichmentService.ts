@@ -34,7 +34,7 @@ export const HomeEnrichmentService = {
         messages: [
           { role: "user", content: buildHomeEnrichmentUserMessage(cards) },
         ],
-      });
+      }, "background");
       const hints = parseHomeEnrichment(
         response.content,
         cards.map((card) => card.id),

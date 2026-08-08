@@ -42,7 +42,7 @@ export function NudgeSettingsInline() {
       onPress={handleCycle}
       style={styles.pill}
     >
-      <Feather name="leaf" size={12} color={colors.brand.sage} />
+      <Feather name="feather" size={12} color={colors.brand.sage} />
       <Text style={styles.label}>
         Nudge: <Text style={styles.value}>{LEVEL_LABELS[current]}</Text>
       </Text>

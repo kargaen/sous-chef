@@ -1,0 +1,155 @@
+name: Build & Release Android RC
+
+on:
+  push:
+    branches: [dev]
+    # Docs, skills, and CI-config pushes must never consume EAS build quota.
+    # A push runs the build only if it touches at least one file NOT ignored
+    # here. Workflow changes themselves are ignored too — test them by
+    # bundling with a code change or reverting this filter deliberately.
+    paths-ignore:
+      - '.claude/**'
+      - '**.md'
+      - '.github/**'
+  # Manual cut of an RC without a code push — used to republish, or to build a
+  # deliberate candidate from the current dev tip.
+  workflow_dispatch:
+
+jobs:
+  migrate-db:
+    name: Apply Database Migrations
+    runs-on: ubuntu-latest
+    # Deliberately outside the cancellable concurrency group below:
+    # a newer push may cancel a stale build, but migrations always finish.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Pinned, not @latest: CLI 2.112.0 broke `link` with
+      # "failed to get api keys: SchemaError" — its response validation rejects
+      # the inserted_at timestamp the platform returns. 2.111.0 is the last
+      # version verified green against this project (run 30705877990, 2026-08-01).
+      # Bump deliberately and watch the migrate-db job; it gates the APK build.
+      - name: Apply Supabase migrations
+        run: |
+          npx supabase@2.111.0 link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+          npx supabase@2.111.0 db push --linked --yes --include-all
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  build:
+    name: Android APK (EAS RC)
+    # Schema first, app second: the APK must never ship against a database
+    # missing the migrations it assumes.
+    needs: migrate-db
+    runs-on: ubuntu-latest
+    # Job-level (not workflow-level) so a newer dev push cancels a stale RC
+    # build without ever cancelling a half-applied migration run.
+    concurrency:
+      group: rc-android-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Fail loudly BEFORE spending an EAS build if the version wasn't bumped:
+      # package.json still carries an -rc for a base version that already has a
+      # stable release. This is the owner's "no new version registered" guard
+      # (EPIC-008) and doubles as the post-release reminder to bump.
+      - name: Guard — RC version not yet released
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE=$(node -p "require('./package.json').version" | sed 's/-rc.*//')
+          if gh release view "v${BASE}" >/dev/null 2>&1; then
+            echo "::error::package.json is still v${BASE}-rc but stable v${BASE} is already released. Bump the version (npm version prepatch/preminor/premajor --preid rc) before cutting a new RC."
+            exit 1
+          fi
+          echo "RC target v${BASE}-rc has no stable release yet — proceeding."
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Cancel stale RC builds
+        run: |
+          # GitHub Actions' own concurrency cancellation (above) only stops the
+          # workflow run — it can't reach an EAS build already submitted to
+          # Expo's servers by an earlier run. Without this, every rapid push to
+          # dev leaves its predecessor's build queued/running on Expo, burning
+          # through the monthly build quota. Explicitly cancel any non-terminal
+          # RC build for this profile before submitting a new one.
+          for STATUS in new in-queue in-progress; do
+            IDS=$(eas build:list \
+              --platform android \
+              --build-profile preview \
+              --status "$STATUS" \
+              --non-interactive --json --limit 10 | jq -r '.[].id')
+            for ID in $IDS; do
+              echo "Canceling stale RC build ($STATUS): $ID"
+              eas build:cancel "$ID" --non-interactive || true
+            done
+          done
+
+      - name: Build APK via EAS
+        id: build
+        run: |
+          BUILD_JSON=$(eas build \
+            --platform android \
+            --profile preview \
+            --non-interactive \
+            --json \
+            2>/tmp/eas-stderr.txt) || { echo "=== EAS error output ==="; cat /tmp/eas-stderr.txt; exit 1; }
+          ARTIFACT_URL=$(echo "$BUILD_JSON" | jq -r '.[0].artifacts.buildUrl')
+          echo "artifact_url=$ARTIFACT_URL" >> $GITHUB_OUTPUT
+
+      - name: Download APK
+        run: curl -fL "${{ steps.build.outputs.artifact_url }}" -o sous-chef.apk
+
+      - name: Get short commit SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Resolve RC tag from package.json
+        id: version
+        run: |
+          FULL=$(node -p "require('./package.json').version")
+          BASE=$(echo "$FULL" | sed 's/-rc.*//')
+          echo "tag=v${BASE}-rc" >> $GITHUB_OUTPUT
+
+      # Delete the previous RC release + tag first so the republished release
+      # carries a fresh publish date. softprops/action-gh-release only swaps the
+      # asset and keeps the original published_at, which makes an up-to-date RC
+      # look weeks stale and invites deleting it by mistake.
+      - name: Delete existing RC release and tag
+        shell: bash
+        run: gh release delete "${{ steps.version.outputs.tag }}" --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create RC release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }} — ${{ steps.sha.outputs.short }}
+          body: |
+            RC build from [`${{ steps.sha.outputs.short }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) on `dev`. Overwrites the previous RC — always the latest.
+
+            **Install:** download `sous-chef.apk` and open it on your Android device.
+            You may need to allow installation from unknown sources in your device settings.
+          files: sous-chef.apk
+          prerelease: true

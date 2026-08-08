@@ -494,7 +494,7 @@ export const usePantryController = () => {
             role: "user",
             content: buildPantrySuggestionsPrompt({
               items: contextItems,
-              cuisinePreferences: profile.cuisinePreferences ?? [],
+              cuisinePreferences: profile.preferences.cuisinePreferences ?? [],
               skillLevel: profile.skillLevel ?? null,
               month: new Date().getMonth() + 1,
             }),
@@ -511,6 +511,37 @@ export const usePantryController = () => {
       return [];
     }
   }, [profile, getPrioritisedSuggestionItems, markItemsSurfaced]);
+
+  // P5.1 — Generates a single recipe suggestion for a specific pantry item.
+  const suggestForItem = useCallback(
+    async (itemName: string): Promise<PantrySuggestion | null> => {
+      if (!profile) return null;
+      try {
+        const response = await LLMService.send({
+          system: PANTRY_SUGGESTION_SYSTEM_PROMPT,
+          messages: [
+            {
+              role: "user",
+              content: buildPantrySwapPrompt(
+                itemName,
+                [],
+                {
+                  cuisinePreferences: profile.preferences.cuisinePreferences ?? [],
+                  skillLevel: profile.skillLevel ?? null,
+                  month: new Date().getMonth() + 1,
+                },
+              ),
+            },
+          ],
+        });
+        const results = parsePantrySuggestions(response.content);
+        return results[0] ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [profile],
+  );
 
   // P5.3 — Swaps one suggestion in the list; returns the replacement or null.
   const swapSuggestion = useCallback(
@@ -529,7 +560,7 @@ export const usePantryController = () => {
                 target.primaryItemName || target.title,
                 current.map((s) => s.title),
                 {
-                  cuisinePreferences: profile.cuisinePreferences ?? [],
+                  cuisinePreferences: profile.preferences.cuisinePreferences ?? [],
                   skillLevel: profile.skillLevel ?? null,
                   month: new Date().getMonth() + 1,
                 },
@@ -636,6 +667,7 @@ export const usePantryController = () => {
     getPrioritisedSuggestionItems,
     markItemsSurfaced,
     suggestFromPantry,
+    suggestForItem,
     swapSuggestion,
     generateRecipeFromIdea,
     findRecipeForSuggestion,

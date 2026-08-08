@@ -1,13 +1,13 @@
 import { Image } from "expo-image";
+import { Pressable } from "react-native";
 
 interface SousChefMarkProps {
   size?: number;
+  onPress?: () => void;
 }
 
-// The small Sous Chef avatar/brand mark — the happy cook SVG. Use this anywhere
-// a "Sous Chef" symbol is needed, instead of a chef emoji.
-export function SousChefMark({ size = 24 }: SousChefMarkProps) {
-  return (
+export function SousChefMark({ size = 24, onPress }: SousChefMarkProps) {
+  const image = (
     <Image
       source={require("../../../assets/svg/companion-happy.svg")}
       style={{ width: size, height: size }}
@@ -15,4 +15,14 @@ export function SousChefMark({ size = 24 }: SousChefMarkProps) {
       accessibilityLabel="Sous Chef"
     />
   );
+
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress}>
+        {image}
+      </Pressable>
+    );
+  }
+
+  return image;
 }

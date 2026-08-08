@@ -7,7 +7,7 @@ export const GEMINI_BASE_URL =
 // Pinned text model. Override per-environment via EXPO_PUBLIC_GEMINI_MODEL
 // (see .env). Keep this a real, accessible model name — not a moving alias —
 // so behavior is reproducible across machines.
-export const DEFAULT_MODEL = "gemini-3.5-flash";
+export const DEFAULT_MODEL = "gemini-2.5-flash";
 const SETTINGS_STORAGE_KEY = "app_settings";
 
 // Dev-only fallback. In production builds (__DEV__ === false) the env key is
@@ -16,8 +16,22 @@ const SETTINGS_STORAGE_KEY = "app_settings";
 // do not ship a production build with a real key in EXPO_PUBLIC_GEMINI_API_KEY.
 const getEnvApiKey = () =>
   __DEV__ ? (process.env.EXPO_PUBLIC_GEMINI_API_KEY?.trim() ?? "") : "";
-const getModel = () =>
-  process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+const getModel = async (): Promise<string> => {
+  if (__DEV__) {
+    try {
+      const raw = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { geminiModel?: unknown };
+        const override =
+          typeof parsed.geminiModel === "string" ? parsed.geminiModel.trim() : "";
+        if (override) return override;
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+};
 
 const getStoredApiKey = async (): Promise<string> => {
   try {
@@ -51,24 +65,60 @@ const toGeminiMessages = (request: LLMRequest) => ({
   })),
 });
 
+const SEND_TIMEOUT_MS = 45_000;
+const MAX_RETRIES = 2;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 export const googleProvider: LLMProvider = {
   send: async (request: LLMRequest): Promise<LLMResponse> => {
     const apiKey = await getApiKey();
-    const model = getModel();
+    const model = await getModel();
     const url = `${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(toGeminiMessages(request)),
-    });
+    const body = JSON.stringify(toGeminiMessages(request));
 
-    if (!response.ok) {
-      throw new Error(`Gemini request failed: ${response.status}`);
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Gemini request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        return { content };
+      } catch (err) {
+        lastError = err;
+        const isAbort =
+          err instanceof Error && err.name === "AbortError";
+        const isRetryable =
+          isAbort ||
+          (err instanceof Error &&
+            (err.message.includes("503") ||
+              err.message.includes("Network request failed")));
+
+        if (isRetryable && attempt < MAX_RETRIES) {
+          await sleep(attempt === 0 ? 1500 : 3000);
+          continue;
+        }
+
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
     }
 
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    return { content };
+    throw lastError;
   },
 
   stream: async (
@@ -76,7 +126,7 @@ export const googleProvider: LLMProvider = {
     onChunk: (chunk: string) => void,
   ): Promise<void> => {
     const apiKey = await getApiKey();
-    const model = getModel();
+    const model = await getModel();
     const url = `${GEMINI_BASE_URL}/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
     const response = await fetch(url, {
       method: "POST",

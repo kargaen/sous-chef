@@ -1,0 +1,4 @@
+interface:
+  display_name: "Roadmap"
+  short_description: "Generate a compact epic roadmap from epics and git state."
+  default_prompt: "Show the roadmap."

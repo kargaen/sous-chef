@@ -1,4 +1,6 @@
 import { Feather } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,9 +21,13 @@ import {
 } from "../../utils/planDateUtils";
 
 export default function MealPlanScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const ctrl = useMealPlanController();
+  const currentStartDate = planStart(ctrl.weekStartDay);
   const [planDayCount, setPlanDayCount] = useState(ctrl.defaultPlanLength);
+  const [selectedStartDate, setSelectedStartDate] = useState(currentStartDate);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   // When a preset is tapped on the empty state, the instructions are queued here
   // so that generateFromRequest fires automatically once activePlan is set.
   const [pendingPreset, setPendingPreset] = useState<string | null>(null);
@@ -30,8 +36,6 @@ export default function MealPlanScreen() {
   const [showSavePreset, setShowSavePreset] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const todayY = useRef(0);
-
-  const currentStartDate = planStart(ctrl.weekStartDay);
 
   useRegisterAssistantContext({
     scope: { kind: "meal_plan" },
@@ -117,10 +121,38 @@ export default function MealPlanScreen() {
           <View style={styles.createForm}>
             <View style={styles.createRow}>
               <Text style={styles.createLabel}>Starting</Text>
-              <Text style={styles.createValue}>
-                {formatDayLabel(currentStartDate)}
-              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose plan start date"
+                onPress={() => setShowStartDatePicker(true)}
+              >
+                <Text style={styles.createValue}>
+                  {formatDayLabel(selectedStartDate)}
+                </Text>
+              </Pressable>
             </View>
+
+            {showStartDatePicker ? (
+              <DateTimePicker
+                value={new Date(`${selectedStartDate}T12:00:00`)}
+                mode="date"
+                onChange={(_, date) => {
+                  setShowStartDatePicker(false);
+                  if (!date) return;
+                  setSelectedStartDate(
+                    [
+                      date.getFullYear(),
+                      String(date.getMonth() + 1).padStart(2, "0"),
+                      String(date.getDate()).padStart(2, "0"),
+                    ].join("-"),
+                  );
+                }}
+              />
+            ) : null}
+
+            {selectedStartDate < todayKey() ? (
+              <Text style={styles.createWarning}>This date is in the past.</Text>
+            ) : null}
 
             <View style={styles.createRow}>
               <Text style={styles.createLabel}>Length</Text>
@@ -164,7 +196,7 @@ export default function MealPlanScreen() {
                     accessibilityLabel={`Start plan from preset: ${preset.name}`}
                     onPress={async () => {
                       setPendingPreset(preset.instructions);
-                      await ctrl.createPlan(currentStartDate, planDayCount);
+                      await ctrl.createPlan(selectedStartDate, planDayCount);
                     }}
                     style={styles.presetChip}
                   >
@@ -180,7 +212,7 @@ export default function MealPlanScreen() {
             label="Create Plan"
             variant="primary"
             onPress={async () => {
-              await ctrl.createPlan(currentStartDate, planDayCount);
+              await ctrl.createPlan(selectedStartDate, planDayCount);
             }}
           />
         </View>
@@ -299,6 +331,31 @@ export default function MealPlanScreen() {
         </View>
       ) : null}
 
+      {ctrl.pendingSlotVariant ? (
+        <View style={styles.reviewBanner}>
+          <Text style={styles.reviewBannerText}>
+            Review {ctrl.pendingSlotVariant.recipe.title}
+          </Text>
+          <View style={styles.reviewBannerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Accept planned recipe variant"
+              onPress={() => ctrl.acceptSlotVariant()}
+              style={styles.reviewAcceptButton}
+            >
+              <Text style={styles.reviewAcceptText}>Use variant</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel planned recipe variant"
+              onPress={ctrl.cancelSlotVariant}
+            >
+              <Text style={styles.reviewDismissText}>Keep original</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
       {/* Suggestion review banner */}
       {ctrl.draftSlots.length > 0 ? (
         <View style={styles.reviewBanner}>
@@ -357,8 +414,12 @@ export default function MealPlanScreen() {
             resolveRecipeTitle={resolveRecipeTitle}
             onAddSlot={handleAddSlot}
             onRemoveSlot={ctrl.removeSlot}
-            onMarkCooked={ctrl.markSlotCooked}
             onAdapt={ctrl.applyPendingAdaptation}
+            onOpenRecipe={(recipeId) => router.push(`/recipe/${recipeId}`)}
+            isSlotCooked={ctrl.isSlotCooked}
+            convertingSlotId={ctrl.convertingSlotId}
+            onCreateRecipe={ctrl.createRecipeForSlot}
+            onCreateVariant={ctrl.requestSlotVariant}
             onAcceptSuggestion={handleAcceptSuggestion}
             onRejectSuggestion={ctrl.removeSuggestionSlot}
             onSuggest={handleSuggest}
@@ -446,6 +507,14 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     fontWeight: typography.weight.semibold,
     color: colors.text.primary,
+  },
+
+  createWarning: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    fontSize: typography.size.xs,
+    lineHeight: typography.lineHeight.xs,
+    color: colors.status.warning,
   },
 
   stepperRow: {

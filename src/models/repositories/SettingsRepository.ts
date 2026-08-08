@@ -5,6 +5,19 @@ import { StorageService } from "@/services/StorageService";
 
 const SETTINGS_STORAGE_KEY = "app_settings";
 
+// A settings blob saved before the onboardingCompleted field existed belongs to
+// a user who was already using the app — treat them as onboarded so the update
+// that adds the first-run gate (EPIC-007) doesn't send them back through the
+// wizard. A genuinely fresh install has no blob at all, so it still onboards.
+const legacyBlobPredatesOnboarding = (raw: string): boolean => {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isObjectRecord(parsed) && !("onboardingCompleted" in parsed);
+  } catch {
+    return false;
+  }
+};
+
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 };
@@ -110,11 +123,20 @@ export class SettingsRepository {
     const storedSettings = parseStoredSettings(raw);
 
     if (storedSettings) {
-      if (storedSettings.wasUpgraded) {
-        await this.save(storedSettings.settings);
+      const needsOnboardingMigration =
+        raw !== null &&
+        !storedSettings.settings.onboardingCompleted &&
+        legacyBlobPredatesOnboarding(raw);
+
+      const settings = needsOnboardingMigration
+        ? { ...storedSettings.settings, onboardingCompleted: true }
+        : storedSettings.settings;
+
+      if (storedSettings.wasUpgraded || needsOnboardingMigration) {
+        await this.save(settings);
       }
 
-      return storedSettings.settings;
+      return settings;
     }
 
     return this.reset();

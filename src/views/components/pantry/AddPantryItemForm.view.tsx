@@ -20,6 +20,7 @@ interface AddPantryItemFormProps {
   onDelete?: () => void;
   onMarkUsed?: () => void;
   onLogWaste?: () => void;
+  onUseInRecipe?: () => void;
   onSuggestShelfLife?: () => void;
   suggestingShelfLife?: boolean;
   loading?: boolean;
@@ -35,6 +36,7 @@ export function AddPantryItemForm({
   onDelete,
   onMarkUsed,
   onLogWaste,
+  onUseInRecipe,
   onSuggestShelfLife,
   suggestingShelfLife = false,
   loading = false,
@@ -151,6 +153,13 @@ export function AddPantryItemForm({
 
       {mode === "edit" ? (
         <View style={styles.secondaryActions}>
+          <Button
+            label="Use in a recipe"
+            variant="secondary"
+            size="sm"
+            onPress={onUseInRecipe}
+            disabled={loading || !onUseInRecipe}
+          />
           <Button
             label="Mark used"
             variant="secondary"

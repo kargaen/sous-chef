@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { CookLogRepository } from "../models/repositories/CookLogRepository";
 import type { RecipeCookStats } from "../models/repositories/CookLogRepository";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("useRecipeController");
 import { RecipeRepository } from "../models/repositories/RecipeRepository";
 import type { Recipe } from "../models/types";
 import {
@@ -32,6 +35,12 @@ interface ImportRecipeSourceInput {
   source: string;
 }
 
+// What happens to a recipe's variants when the recipe itself is deleted. The
+// cook is asked, because only they know whether an adapted version was the
+// keeper — variants are hidden from listings, so an undecided delete would
+// strand them on disk with no way back to them.
+export type VariantDisposition = "keep" | "delete";
+
 // Manual edits from the Edit Recipe form — no LLM, just the fields the user
 // can change by hand. Photo is handled separately by the photo controller.
 interface RecipeEditsInput {
@@ -59,6 +68,7 @@ export const useRecipeController = () => {
   );
 
   const search = async (query: string): Promise<void> => {
+    log.debug("Searching recipes", { query });
     setLoading(true);
     setError(null);
     try {
@@ -76,8 +86,10 @@ export const useRecipeController = () => {
         );
         return !hasDisliked && !hasExcludedTag;
       });
+      log.debug("Search results", { query, found: filtered.length });
       setResults(filtered);
-    } catch {
+    } catch (error) {
+      log.error("Recipe search failed", error);
       setError("Could not search recipes.");
     } finally {
       setLoading(false);
@@ -85,12 +97,19 @@ export const useRecipeController = () => {
   };
 
   const fetchById = async (id: string): Promise<void> => {
+    log.debug("Fetching recipe by id", { id });
     setLoading(true);
     setError(null);
     try {
       const recipe = await repo.fetchById(id);
+      if (recipe) {
+        log.debug("Recipe fetched", { id, title: recipe.title });
+      } else {
+        log.warn("Recipe not found", { id });
+      }
       setActiveRecipe(recipe);
-    } catch {
+    } catch (error) {
+      log.error("Could not load recipe", error);
       setError("Could not load recipe.");
     } finally {
       setLoading(false);
@@ -125,6 +144,7 @@ export const useRecipeController = () => {
   };
 
   const saveRecipe = async (recipe: Recipe): Promise<Recipe | null> => {
+    log.info("Saving recipe", { id: recipe.id, title: recipe.title });
     setLoading(true);
     setError(null);
     try {
@@ -134,7 +154,8 @@ export const useRecipeController = () => {
       // a moment later without blocking the save.
       void generateDimensionsIfMissing(recipe);
       return recipe;
-    } catch {
+    } catch (error) {
+      log.error("Could not save recipe", error);
       setError("Could not save recipe.");
       return null;
     } finally {
@@ -172,6 +193,7 @@ export const useRecipeController = () => {
       return null;
     }
 
+    log.info("Saving recipe edits", { id: original.id, title: edits.title });
     setLoading(true);
     setError(null);
     try {
@@ -194,8 +216,10 @@ export const useRecipeController = () => {
       await repo.save(updated);
       setActiveRecipe(updated);
       HabitService.record("recipe_saved");
+      log.info("Recipe edits saved", { id: updated.id });
       return updated;
-    } catch {
+    } catch (error) {
+      log.error("Could not save recipe edits", error);
       setError("Could not save your changes.");
       return null;
     } finally {
@@ -223,6 +247,48 @@ export const useRecipeController = () => {
       cookLogRepo.recordCook({ recipeId: recipe.id });
     } catch {
       // A failed cook-log write must not break the cooking flow.
+    }
+  };
+
+  // Deletion is permanent — the recipes table has no tombstone — so the caller
+  // is expected to have confirmed with the cook first. Returns whether the
+  // recipe was removed, so the view knows when it is safe to navigate away.
+  const deleteRecipe = async (
+    id: string,
+    variantDisposition?: VariantDisposition,
+  ): Promise<boolean> => {
+    log.info("Deleting recipe", { id, variantDisposition });
+    setLoading(true);
+    setError(null);
+    try {
+      const variants = await repo.getVariants(id);
+
+      if (variants.length > 0) {
+        if (variantDisposition === "delete") {
+          for (const variant of variants) {
+            await repo.delete(variant.id);
+          }
+        } else {
+          // Promote before deleting the parent: interrupted here, the worst
+          // state is a standalone variant next to a still-present original,
+          // which the cook can see and act on. The reverse order would leave
+          // variants pointing at a recipe that no longer exists.
+          for (const variant of variants) {
+            await repo.promoteVariant(variant.id);
+          }
+        }
+      }
+
+      await repo.delete(id);
+      setActiveRecipe((current) => (current?.id === id ? null : current));
+      log.info("Recipe deleted", { id, variantsAffected: variants.length });
+      return true;
+    } catch (error) {
+      log.error("Could not delete recipe", error);
+      setError("Could not delete recipe.");
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -309,6 +375,7 @@ Apply the requested change and return the full updated recipe.`,
     sourceMode,
     source,
   }: ImportRecipeSourceInput): Promise<RecipeBuilderInput | null> => {
+    log.info("Importing recipe", { sourceMode, sourceLength: source.length });
     const trimmedSource = source.trim();
 
     if (!trimmedSource) {
@@ -340,7 +407,8 @@ Apply the requested change and return the full updated recipe.`,
         sourceText = await RecipeImportService.fetchReadableRecipeText(
           trimmedSource,
         );
-      } catch {
+      } catch (error) {
+        log.error("URL fetch failed during recipe import", error);
         showCompanion(
           "happy",
           "I couldn't read that page — some sites block apps or hide the recipe behind a login. Try pasting the recipe text into the Paste tab instead.",
@@ -353,21 +421,41 @@ Apply the requested change and return the full updated recipe.`,
     const promptMode = sourceMode === "idea" ? "idea" : "paste";
 
     try {
-      const response = await LLMService.send({
-        system: buildSystemPrompt(profile),
-        messages: [
-          {
-            role: "user",
-            content: buildRecipeImportPrompt({
-              sourceMode: promptMode,
-              source: sourceText,
-            }),
+      const response = await LLMService.send(
+        {
+          system: buildSystemPrompt(profile),
+          messages: [
+            {
+              role: "user",
+              content: buildRecipeImportPrompt({
+                sourceMode: promptMode,
+                source: sourceText,
+              }),
+            },
+          ],
+        },
+        "user",
+        {
+          onQueued: () => {
+            showCompanion(
+              "exhausted",
+              "Already working on something — your recipe import is next in line. Hang tight.",
+            );
           },
-        ],
-      });
+          onRateLimited: () => {
+            showCompanion(
+              "exhausted",
+              "Hit the rate limit — retrying automatically in a moment. No need to do anything.",
+            );
+          },
+        },
+      );
 
-      return parseRecipeDraftFromLLM(response.content);
-    } catch {
+      const draft = parseRecipeDraftFromLLM(response.content);
+      log.info("Recipe import parsed", { title: draft.title });
+      return draft;
+    } catch (error) {
+      log.error("Recipe import LLM call failed", error);
       showCompanion(
         "exhausted",
         "Sous Chef is a little exhausted and couldn't shape that recipe right now. Give me a moment and try again.",
@@ -376,9 +464,7 @@ Apply the requested change and return the full updated recipe.`,
           route: "/settings?focus=assistant",
         },
       );
-      setError(
-        "Sous Chef could not import that recipe right now.",
-      );
+      setError("Sous Chef could not import that recipe right now.");
       return null;
     }
   };
@@ -389,6 +475,7 @@ Apply the requested change and return the full updated recipe.`,
     saveRecipe,
     saveRecipeEdits,
     saveDraftRecipe,
+    deleteRecipe,
     markCooked,
     getSaved,
     getVariants,

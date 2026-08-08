@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { spacing } from "@/constants";
 import { Button, Spinner, TextField } from "@/views/components/ui";
 import { screenStyles, textStyles } from "@/views/styles";
+import { clearLogBuffer, exportLogs } from "@/utils/logger";
 
 import { useSettingsScreenView } from "./SettingsScreen.hooks";
 import { styles } from "./SettingsScreen.styles";
@@ -11,7 +12,6 @@ import { styles } from "./SettingsScreen.styles";
 export default function SettingsScreen() {
   const view = useSettingsScreenView();
   const insets = useSafeAreaInsets();
-
   if (!view.hasLoaded) {
     return <Spinner label="Loading settings..." />;
   }
@@ -438,12 +438,16 @@ export default function SettingsScreen() {
             <Text style={styles.cardTitle}>
               {view.authStatus === "authenticated"
                 ? "Signed in"
-                : "Not signed in"}
+                : view.pendingSignup
+                  ? "Confirmation pending"
+                  : "Not signed in"}
             </Text>
             <Text style={styles.cardCopy}>
               {view.authStatus === "authenticated"
                 ? (view.authUser?.email ?? "Account connected.")
-                : "Sign in to enable backups."}
+                : view.pendingSignup
+                  ? `Confirm the mail sent to ${view.pendingSignup.email}, then sign in.`
+                  : "Sign in to enable backups."}
             </Text>
           </View>
 
@@ -468,6 +472,29 @@ export default function SettingsScreen() {
                   variant="ghost"
                   onPress={view.handleRestoreNow}
                   loading={view.backupLoading}
+                />
+              </>
+            ) : view.pendingSignup ? (
+              <>
+                <Button
+                  label="Resend confirmation mail"
+                  variant="ghost"
+                  onPress={() => {
+                    void view.handleResendConfirmation();
+                  }}
+                  disabled={!view.canResendConfirmation}
+                  loading={view.authLoading}
+                />
+                {!view.canResendConfirmation ? (
+                  <Text style={styles.helperText}>
+                    A mail was sent recently — resend unlocks in a few minutes.
+                  </Text>
+                ) : null}
+                <Button
+                  label="Sign in"
+                  variant="secondary"
+                  onPress={view.handleOpenAuth}
+                  loading={view.authLoading}
                 />
               </>
             ) : (
@@ -531,13 +558,12 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {__DEV__ ? (
-        <View style={styles.sectionBlock}>
+      <View style={styles.sectionBlock}>
           <Text style={styles.sectionEyebrow}>Debug</Text>
           <Text style={styles.sectionTitle}>Developer tools</Text>
           <Text style={styles.sectionCopy}>
-            Only visible in development builds. These settings cannot be enabled
-            in production.
+            Tools for testing and debugging. Safety layer skip is always
+            enforced in compiled builds regardless of this toggle.
           </Text>
 
           <View style={styles.card}>
@@ -586,8 +612,58 @@ export default function SettingsScreen() {
               </View>
             </View>
           </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Model override</Text>
+              <Text style={styles.cardCopy}>
+                Override the Gemini model for this dev session. Leave blank to
+                use the default. Has no effect in compiled builds.
+              </Text>
+            </View>
+            <View style={styles.fieldGroup}>
+              <TextField
+                label="Model name"
+                value={view.draft.geminiModel ?? ""}
+                onChangeText={(geminiModel) => {
+                  view.updateDraft({ geminiModel });
+                }}
+                placeholder={`Default: gemini-2.5-flash`}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Diagnostic log</Text>
+              <Text style={styles.cardCopy}>
+                Exports the in-memory log buffer (last 500 entries). Share it
+                as a file or copy it to the clipboard for debugging.
+              </Text>
+            </View>
+            <View style={styles.fieldGroup}>
+              <Button
+                label="Share log"
+                variant="secondary"
+                size="sm"
+                onPress={() => {
+                  void Share.share({
+                    title: "Sous Chef diagnostic log",
+                    message: exportLogs(),
+                  });
+                }}
+              />
+              <Button
+                label="Clear log buffer"
+                variant="ghost"
+                size="sm"
+                onPress={clearLogBuffer}
+              />
+            </View>
+          </View>
         </View>
-      ) : null}
 
       <View style={styles.footerActions}>
         <Button

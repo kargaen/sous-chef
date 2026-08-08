@@ -67,6 +67,21 @@ const slug = (value: string): string =>
 const seedPromptFor = (title: string, hook: string): string =>
   `${title} — ${hook}`;
 
+const normalizeTitle = (title: string): string => title.trim().toLowerCase();
+
+const uniqueByTitle = (
+  sparks: GeneratedSpark[],
+  avoidTitles: string[] = [],
+): GeneratedSpark[] => {
+  const seen = new Set(avoidTitles.map(normalizeTitle));
+  return sparks.filter((spark) => {
+    const key = normalizeTitle(spark.title);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const sparkToMintInput = (
   spark: GeneratedSpark,
   seed: number,
@@ -81,25 +96,43 @@ const sparkToMintInput = (
   relevance: 0.55,
 });
 
+const STATIC_FALLBACK_SPARKS: GeneratedSpark[] = [
+  {
+    title: "Clear-the-Fridge Stir-Fry",
+    hook: "Whatever's lurking in the fridge, transformed in one hot pan.",
+  },
+  {
+    title: "Cook Something New",
+    hook: "Pick a cuisine you've never tried and start there.",
+  },
+  {
+    title: "Summer Berry Crumble",
+    hook: "A warm, comforting hug of sweet berries and buttery crisp topping.",
+  },
+  {
+    title: "Pantry Pasta Night",
+    hook: "Turn a box of pasta and a few cupboard finds into dinner.",
+  },
+  {
+    title: "Breakfast-for-Dinner Eggs",
+    hook: "Use eggs, toast, and odds and ends for a low-effort plate.",
+  },
+  {
+    title: "Big Salad with Something Crispy",
+    hook: "Build a crunchy, filling salad around whatever needs using first.",
+  },
+];
+
 // Deterministic, no-LLM sparks so the lane is never empty (offline / LLM down).
-const fallbackSparks = (produce: SeasonalProduce[]): GeneratedSpark[] => {
-  const picks = produce.slice(0, 3);
-  if (picks.length > 0) {
-    return picks.map((item) => ({
-      title: `Something with ${item.name}`,
-      hook: `Make the most of in-season ${item.name.toLowerCase()} tonight.`,
-    }));
-  }
-  return [
-    {
-      title: "Clear-the-Fridge Stir-Fry",
-      hook: "Whatever's lurking in the fridge, transformed in one hot pan.",
-    },
-    {
-      title: "Cook Something New",
-      hook: "Pick a cuisine you've never tried and start there.",
-    },
-  ];
+const fallbackSparks = (
+  produce: SeasonalProduce[],
+  avoidTitles: string[] = [],
+): GeneratedSpark[] => {
+  const produceSparks = produce.slice(0, 3).map((item) => ({
+    title: `Something with ${item.name}`,
+    hook: `Make the most of in-season ${item.name.toLowerCase()} tonight.`,
+  }));
+  return uniqueByTitle([...produceSparks, ...STATIC_FALLBACK_SPARKS], avoidTitles);
 };
 
 const buildSparkContext = async (
@@ -132,11 +165,13 @@ const generateSparks = async (
     const response = await LLMService.send({
       system: SPARKS_SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildSparksUserMessage(context) }],
-    });
+    }, "background");
     const sparks = parseSparks(response.content);
-    return sparks.length > 0 ? sparks : fallbackSparks(produce);
+    return sparks.length > 0
+      ? uniqueByTitle(sparks, avoidTitles)
+      : fallbackSparks(produce, avoidTitles);
   } catch {
-    return fallbackSparks(produce);
+    return fallbackSparks(produce, avoidTitles);
   }
 };
 
@@ -393,7 +428,7 @@ export const InspirationService = {
             }),
           },
         ],
-      });
+      }, "background");
       const parsed = parseLeftover(response.content);
       if (parsed) {
         title = parsed.title;
@@ -454,7 +489,7 @@ export const InspirationService = {
         messages: [
           { role: "user", content: buildGenerateThemesUserMessage(context) },
         ],
-      });
+      }, "background");
       generated = parseGeneratedThemes(response.content);
     } catch {
       return [];

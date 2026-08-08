@@ -80,7 +80,7 @@ export function AssistantShell() {
             title: imported.title,
             ingredientsText: imported.ingredientsText,
             stepsText: imported.stepsText,
-            notes: imported.notes,
+            notes: imported.notes ?? "",
             cookbookId: null,
           });
           router.push("/(tabs)/recipes/draft");
