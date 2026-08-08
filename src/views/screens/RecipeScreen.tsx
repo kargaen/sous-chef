@@ -16,6 +16,10 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { colors, spacing } from "@/constants";
 import type { VariantDisposition } from "@/controllers/useRecipeController";
+import {
+  RecipeActionsMenu,
+  type RecipeActionsMenuItem,
+} from "@/views/components/recipe/RecipeActionsMenu";
 import { Button } from "@/views/components/ui";
 import { useSafeBack } from "@/views/hooks/useSafeBack";
 import { screenStyles, textStyles } from "@/views/styles";
@@ -163,6 +167,34 @@ export default function RecipeScreen() {
     );
   };
 
+  // Everything past the two headline actions lives behind the ⋮ menu, in the
+  // order the cook is most likely to want it.
+  const buildMenuItems = (page: RecipePage): RecipeActionsMenuItem[] => {
+    const items: RecipeActionsMenuItem[] = [
+      {
+        label: "Edit recipe",
+        onPress: () => router.push(`/recipe/edit?id=${page.recipe.id}`),
+      },
+    ];
+
+    if (page.isVariant) {
+      items.push({
+        label: "Make this its own recipe",
+        onPress: () => {
+          void handlePromote();
+        },
+      });
+    }
+
+    items.push({
+      label: page.isVariant ? "Delete variant" : "Delete recipe",
+      onPress: confirmDelete,
+      destructive: true,
+    });
+
+    return items;
+  };
+
   const renderHeroCard = (page: RecipePage) => (
     <View
       key={page.recipe.id}
@@ -205,32 +237,16 @@ export default function RecipeScreen() {
       <View style={styles.heroActions}>
         <Button
           label="Start cooking"
+          style={styles.heroActionPrimary}
           onPress={() => router.push(`/recipe/cook?id=${page.recipe.id}`)}
         />
         <Button
           label="Adapt recipe"
           variant="secondary"
+          style={styles.heroActionPrimary}
           onPress={() => router.push(`/recipe/adapt?id=${page.recipe.id}`)}
         />
-        <Button
-          label="Edit recipe"
-          variant="ghost"
-          onPress={() => router.push(`/recipe/edit?id=${page.recipe.id}`)}
-        />
-        {page.isVariant ? (
-          <Button
-            label="Make this its own recipe"
-            variant="ghost"
-            onPress={() => {
-              void handlePromote();
-            }}
-          />
-        ) : null}
-        <Button
-          label={page.isVariant ? "Delete variant" : "Delete recipe"}
-          variant="danger"
-          onPress={confirmDelete}
-        />
+        <RecipeActionsMenu items={buildMenuItems(page)} />
       </View>
     </View>
   );

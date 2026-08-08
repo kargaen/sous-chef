@@ -303,7 +303,13 @@ export const styles = StyleSheet.create({
     marginTop: spacing.sm,
     flexDirection: "row",
     flexWrap: "wrap",
+    alignItems: "flex-start",
     gap: spacing.sm,
+  },
+
+  // The two headline actions share the row; the ⋮ trigger keeps its own width.
+  heroActionPrimary: {
+    flex: 1,
   },
 
   twoColumnLead: {

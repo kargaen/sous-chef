@@ -156,6 +156,7 @@ carry no contract another layer depends on.
 - [x] 2. Implement `deleteRecipe` with variant disposition in `src/controllers/useRecipeController.ts` — done when item 1 passes and no existing test in that file regresses. (`useRecipeController.deleteRecipe` + exported `VariantDisposition`; suite 16 passed.)
 - [x] 3. Expose a `handleDelete` action and variant count from `src/views/screens/RecipeScreen.hooks.ts` — done when `npx tsc --noEmit` is clean and the screen can ask the controller to delete the page it is showing. (`useRecipeScreenView.handleDelete` + `variantCount`; `npx tsc --noEmit` clean.)
 - [x] 4. Add the delete button and its confirmations to `src/views/screens/RecipeScreen.tsx` — done when a recipe with variants raises the three-way question, one without raises a plain confirm, and both return the cook to the previous screen. (`confirmDelete`/`runDelete` + danger-variant `Button` in `heroActions`; owner device test outstanding — see §5.)
+- [x] 5. (added 2026-08-08) Park every action but the two headline ones behind a `⋮` menu in `src/views/components/recipe/RecipeActionsMenu/` — done when the hero row is Start cooking (primary), Adapt recipe (secondary), `⋮` (secondary), and Edit / Make this its own recipe / Delete sit inside the menu. (Owner request; `RecipeActionsMenu` component triad, delete rendered as the destructive item. Supersedes item 4's flat danger button — the delete *behaviour* it pinned is unchanged.)
 
 ---
 
@@ -192,6 +193,7 @@ That is a known EPIC-002 dependency, not a new debt.
 | Q2 | Should a meal-plan slot pointing at a deleted recipe clear itself, or degrade to its plain text? | No — the slot contract already tolerates an unresolvable id | Whenever a cook reports a blank planned meal |
 | Q3 | Should delete also be reachable from the saved-recipe listing? | No | After the owner has used the button on the recipe screen |
 | Q4 | Does the three-button variant dialog read clearly on a real device, or does it need a bottom sheet? | No — the flow works either way | Owner device test; `Alert.alert` renders three buttons stacked on Android, which is untested here |
+| Q5 | Should the `⋮` menu dismiss when the cook taps elsewhere on the screen? | No — every item either navigates away or raises a dialog, so it cannot be left stranded open | Whenever a second consumer needs the menu; an outside-press scrim is a `ui/` primitive concern, not a recipe one |
 
 ### New capability
 
